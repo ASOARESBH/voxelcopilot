@@ -1,0 +1,267 @@
+<?php
+namespace App\Controllers;
+
+use App\Core\Auth;
+use App\Core\Controller;
+use App\Core\Database;
+use App\Middlewares\TenantMiddleware;
+use App\Services\PacsService;
+use App\Services\CopilotAIService;
+
+class WorkspaceController extends Controller {
+
+    public function index(): void {
+        TenantMiddleware::handle();
+        $pdo      = Database::getInstance();
+        $medicoId = Auth::userId();
+        $tenantId = Auth::tenantId();
+
+        $page    = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = 15;
+        $offset  = ($page - 1) * $perPage;
+        $status  = $_GET['status'] ?? '';
+        $busca   = trim($_GET['busca'] ?? '');
+
+        $where  = ["l.medico_id = :mid", "l.tenant_id = :tid"];
+        $params = ['mid' => $medicoId, 'tid' => $tenantId];
+
+        if ($status) { $where[] = "l.status = :status"; $params['status'] = $status; }
+        if ($busca)  { $where[] = "(w.patient_nome LIKE :busca OR w.study_uid LIKE :busca)"; $params['busca'] = "%{$busca}%"; }
+
+        $whereStr = implode(' AND ', $where);
+
+        $total = $pdo->prepare("SELECT COUNT(*) FROM cop_laudos l JOIN cop_workspaces w ON w.id = l.workspace_id WHERE {$whereStr}");
+        $total->execute($params);
+        $total = (int) $total->fetchColumn();
+
+        $stmt = $pdo->prepare("
+            SELECT l.id, l.status, l.versao, l.created_at, l.assinado_em,
+                   w.patient_nome, w.modalidade, w.study_uid, w.patient_uid
+            FROM cop_laudos l
+            JOIN cop_workspaces w ON w.id = l.workspace_id
+            WHERE {$whereStr}
+            ORDER BY l.created_at DESC
+            LIMIT {$perPage} OFFSET {$offset}
+        ");
+        $stmt->execute($params);
+        $laudos = $stmt->fetchAll();
+
+        $this->view('workspace/index', [
+            'title'      => 'Laudos — VOXEL Copilot',
+            'pageTitle'  => 'Workspace de Laudos',
+            'pageSubtitle'=> 'Gerencie seus laudos',
+            'laudos'     => $laudos,
+            'total'      => $total,
+            'page'       => $page,
+            'perPage'    => $perPage,
+            'totalPages' => (int) ceil($total / $perPage),
+            'status'     => $status,
+            'busca'      => $busca,
+        ]);
+    }
+
+    public function novo(): void {
+        TenantMiddleware::handle();
+        $pdo      = Database::getInstance();
+        $tenantId = Auth::tenantId();
+
+        // Busca templates disponíveis
+        $templates = $pdo->prepare("
+            SELECT id, nome, modalidade, especialidade
+            FROM cop_templates
+            WHERE tenant_id = :tid AND ativo = 1
+            ORDER BY uso_count DESC, nome ASC
+        ");
+        $templates->execute(['tid' => $tenantId]);
+        $templates = $templates->fetchAll();
+
+        // Busca configuração do PACS do tenant
+        $pacsConfig = $pdo->prepare("SELECT pacs_api_url, pacs_api_token FROM cop_tenants WHERE id = :id LIMIT 1");
+        $pacsConfig->execute(['id' => $tenantId]);
+        $pacsConfig = $pacsConfig->fetch();
+
+        $this->view('workspace/novo', [
+            'title'      => 'Novo Laudo — VOXEL Copilot',
+            'pageTitle'  => 'Novo Laudo',
+            'pageSubtitle'=> 'Assistido por IA',
+            'templates'  => $templates,
+            'pacsConfig' => $pacsConfig,
+            'csrf_token' => $this->csrfToken(),
+        ]);
+    }
+
+    public function criar(): void {
+        TenantMiddleware::handle();
+        $pdo      = Database::getInstance();
+        $medicoId = Auth::userId();
+        $tenantId = Auth::tenantId();
+
+        $studyUid    = trim($_POST['study_uid']    ?? '');
+        $patientNome = trim($_POST['patient_nome'] ?? '');
+        $patientUid  = trim($_POST['patient_uid']  ?? '');
+        $modalidade  = trim($_POST['modalidade']   ?? '');
+        $templateId  = (int)($_POST['template_id'] ?? 0);
+
+        if (!$studyUid) {
+            $this->redirect('/workspace/novo?erro=study_uid_obrigatorio');
+        }
+
+        // Cria workspace
+        $pdo->prepare("
+            INSERT INTO cop_workspaces (tenant_id, medico_id, study_uid, patient_uid, patient_nome, modalidade, status, assumido_em, created_at, updated_at)
+            VALUES (:tid, :mid, :study_uid, :patient_uid, :patient_nome, :modalidade, 'aberto', NOW(), NOW(), NOW())
+        ")->execute([
+            'tid'          => $tenantId,
+            'mid'          => $medicoId,
+            'study_uid'    => $studyUid,
+            'patient_uid'  => $patientUid ?: null,
+            'patient_nome' => $patientNome ?: null,
+            'modalidade'   => $modalidade ?: null,
+        ]);
+        $workspaceId = (int) $pdo->lastInsertId();
+
+        // Carrega template se selecionado
+        $corpo = '';
+        if ($templateId) {
+            $tpl = $pdo->prepare("SELECT corpo FROM cop_templates WHERE id = :id AND tenant_id = :tid LIMIT 1");
+            $tpl->execute(['id' => $templateId, 'tid' => $tenantId]);
+            $tpl = $tpl->fetch();
+            if ($tpl) {
+                $corpo = $tpl->corpo;
+                // Incrementa uso do template
+                $pdo->prepare("UPDATE cop_templates SET uso_count = uso_count + 1 WHERE id = :id")->execute(['id' => $templateId]);
+            }
+        }
+
+        // Cria laudo em rascunho
+        $pdo->prepare("
+            INSERT INTO cop_laudos (workspace_id, tenant_id, medico_id, versao, achados, status, created_at, updated_at)
+            VALUES (:wid, :tid, :mid, 1, :achados, 'rascunho', NOW(), NOW())
+        ")->execute([
+            'wid'    => $workspaceId,
+            'tid'    => $tenantId,
+            'mid'    => $medicoId,
+            'achados'=> $corpo,
+        ]);
+        $laudoId = (int) $pdo->lastInsertId();
+
+        $this->redirect("/workspace/{$laudoId}");
+    }
+
+    public function show(int $id): void {
+        TenantMiddleware::handle();
+        $pdo      = Database::getInstance();
+        $medicoId = Auth::userId();
+        $tenantId = Auth::tenantId();
+
+        $stmt = $pdo->prepare("
+            SELECT l.*, w.study_uid, w.patient_nome, w.patient_uid, w.modalidade
+            FROM cop_laudos l
+            JOIN cop_workspaces w ON w.id = l.workspace_id
+            WHERE l.id = :id AND l.medico_id = :mid AND l.tenant_id = :tid
+            LIMIT 1
+        ");
+        $stmt->execute(['id' => $id, 'mid' => $medicoId, 'tid' => $tenantId]);
+        $laudo = $stmt->fetch();
+
+        if (!$laudo) $this->redirect('/workspace');
+
+        // Templates para troca rápida
+        $templates = $pdo->prepare("SELECT id, nome, modalidade FROM cop_templates WHERE tenant_id = :tid AND ativo = 1 ORDER BY uso_count DESC LIMIT 20");
+        $templates->execute(['tid' => $tenantId]);
+        $templates = $templates->fetchAll();
+
+        // Autotextos
+        $autotextos = $pdo->prepare("
+            SELECT atalho, texto FROM cop_autotextos
+            WHERE tenant_id = :tid AND ativo = 1
+              AND (user_id IS NULL OR user_id = :uid)
+            ORDER BY atalho ASC
+        ");
+        $autotextos->execute(['tid' => $tenantId, 'uid' => $medicoId]);
+        $autotextos = $autotextos->fetchAll();
+
+        // Histórico de conversa com IA
+        $conversas = $pdo->prepare("
+            SELECT role, conteudo, created_at FROM cop_ia_conversas
+            WHERE workspace_id = :wid
+            ORDER BY created_at ASC
+            LIMIT 50
+        ");
+        $conversas->execute(['wid' => $laudo->workspace_id]);
+        $conversas = $conversas->fetchAll();
+
+        $this->view('workspace/show', [
+            'title'      => 'Laudo — VOXEL Copilot',
+            'pageTitle'  => 'Editor de Laudo',
+            'pageSubtitle'=> $laudo->patient_nome ?? $laudo->study_uid,
+            'laudo'      => $laudo,
+            'templates'  => $templates,
+            'autotextos' => $autotextos,
+            'conversas'  => $conversas,
+            'csrf_token' => $this->csrfToken(),
+        ]);
+    }
+
+    public function salvar(int $id): void {
+        TenantMiddleware::handle();
+        $pdo      = Database::getInstance();
+        $medicoId = Auth::userId();
+        $tenantId = Auth::tenantId();
+
+        $stmt = $pdo->prepare("SELECT id FROM cop_laudos WHERE id = :id AND medico_id = :mid AND tenant_id = :tid AND status = 'rascunho' LIMIT 1");
+        $stmt->execute(['id' => $id, 'mid' => $medicoId, 'tid' => $tenantId]);
+        if (!$stmt->fetch()) {
+            $this->json(['ok' => false, 'msg' => 'Laudo não encontrado ou já assinado.'], 403);
+        }
+
+        $pdo->prepare("
+            UPDATE cop_laudos SET
+                indicacao    = :indicacao,
+                tecnica      = :tecnica,
+                achados      = :achados,
+                impressao    = :impressao,
+                recomendacao = :recomendacao,
+                cid          = :cid,
+                updated_at   = NOW()
+            WHERE id = :id
+        ")->execute([
+            'id'          => $id,
+            'indicacao'   => $_POST['indicacao']   ?? null,
+            'tecnica'     => $_POST['tecnica']     ?? null,
+            'achados'     => $_POST['achados']     ?? null,
+            'impressao'   => $_POST['impressao']   ?? null,
+            'recomendacao'=> $_POST['recomendacao']?? null,
+            'cid'         => $_POST['cid']         ?? null,
+        ]);
+
+        $this->json(['ok' => true, 'msg' => 'Laudo salvo com sucesso.']);
+    }
+
+    public function assinar(int $id): void {
+        TenantMiddleware::handle();
+        $pdo      = Database::getInstance();
+        $medicoId = Auth::userId();
+        $tenantId = Auth::tenantId();
+
+        $stmt = $pdo->prepare("SELECT id FROM cop_laudos WHERE id = :id AND medico_id = :mid AND tenant_id = :tid AND status = 'rascunho' LIMIT 1");
+        $stmt->execute(['id' => $id, 'mid' => $medicoId, 'tid' => $tenantId]);
+        if (!$stmt->fetch()) {
+            $this->json(['ok' => false, 'msg' => 'Laudo não encontrado ou já assinado.'], 403);
+        }
+
+        $pdo->prepare("
+            UPDATE cop_laudos SET status = 'assinado', assinado_em = NOW(), updated_at = NOW()
+            WHERE id = :id
+        ")->execute(['id' => $id]);
+
+        // Atualiza contagem no perfil
+        $pdo->prepare("
+            INSERT INTO cop_medico_perfil (user_id, tenant_id, total_laudos)
+            VALUES (:uid, :tid, 1)
+            ON DUPLICATE KEY UPDATE total_laudos = total_laudos + 1, updated_at = NOW()
+        ")->execute(['uid' => $medicoId, 'tid' => $tenantId]);
+
+        $this->json(['ok' => true, 'msg' => 'Laudo assinado com sucesso.']);
+    }
+}

@@ -1,0 +1,26 @@
+# Ambiente
+.env
+.env.local
+.env.production
+
+# Logs e sessões
+storage/logs/*.log
+storage/sessions/*
+storage/uploads/*
+!storage/logs/.gitkeep
+!storage/sessions/.gitkeep
+!storage/uploads/.gitkeep
+
+# Dependências
+vendor/
+node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
