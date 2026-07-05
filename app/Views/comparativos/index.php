@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Comparativos', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <div class="page-content">
   <div class="comparativos-lista">
@@ -60,4 +59,3 @@
 .comp-actions { display:flex; justify-content:flex-end; }
 </style>
 
-<?php $this->layout('layout/copilot_footer'); ?>

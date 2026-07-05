@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Vision AI', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <div class="page-content">
   <div class="vision-intro card mb-4">
@@ -132,4 +131,3 @@ async function iniciarAnalise() {
 }
 </script>
 
-<?php $this->layout('layout/copilot_footer'); ?>

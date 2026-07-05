@@ -22,7 +22,7 @@ class MedicalProfileController extends Controller
      */
     public function index(): void
     {
-        $userId = Auth::id();
+        $userId = Auth::userId();
 
         // Busca ou cria o perfil do médico
         $perfil = $this->db->fetch(
@@ -120,7 +120,7 @@ class MedicalProfileController extends Controller
     public function salvar(): void
     {
         header('Content-Type: application/json');
-        $userId = Auth::id();
+        $userId = Auth::userId();
 
         $estilo = $_POST['estilo_laudo'] ?? 'formal';
         $nivel = $_POST['nivel_detalhe'] ?? 'detalhado';
@@ -169,7 +169,7 @@ class MedicalProfileController extends Controller
     public function salvarAutotexto(): void
     {
         header('Content-Type: application/json');
-        $userId = Auth::id();
+        $userId = Auth::userId();
 
         $atalho = trim($_POST['atalho'] ?? '');
         $texto = trim($_POST['texto'] ?? '');
@@ -208,7 +208,7 @@ class MedicalProfileController extends Controller
     public function excluirAutotexto(): void
     {
         header('Content-Type: application/json');
-        $userId = Auth::id();
+        $userId = Auth::userId();
         $id = (int)($_POST['id'] ?? 0);
 
         if (!$id) {
@@ -230,7 +230,7 @@ class MedicalProfileController extends Controller
     public function getAutotextos(): void
     {
         header('Content-Type: application/json');
-        $userId = Auth::id();
+        $userId = Auth::userId();
         $busca = trim($_GET['q'] ?? '');
 
         $sql = "SELECT id, atalho, texto, categoria FROM cop_autotextos WHERE user_id = ?";
@@ -254,7 +254,7 @@ class MedicalProfileController extends Controller
     public function registrarUsoAutotexto(): void
     {
         header('Content-Type: application/json');
-        $userId = Auth::id();
+        $userId = Auth::userId();
         $id = (int)($_POST['id'] ?? 0);
 
         if ($id) {
@@ -273,7 +273,7 @@ class MedicalProfileController extends Controller
     public function getPerfil(): void
     {
         header('Content-Type: application/json');
-        $userId = Auth::id();
+        $userId = Auth::userId();
 
         $perfil = $this->db->fetch(
             "SELECT mp.*, p.nome as provider_nome, p.tipo as provider_tipo, p.modelo_padrao

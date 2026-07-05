@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Fila Inteligente', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <div class="page-content">
 
@@ -174,4 +173,3 @@
 }
 </style>
 
-<?php $this->layout('layout/copilot_footer'); ?>

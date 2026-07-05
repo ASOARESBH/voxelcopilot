@@ -42,8 +42,13 @@ class Router {
             if ($route['method'] === $method && preg_match($pattern, $uri, $matches)) {
                 array_shift($matches);
 
+                // Converte parâmetros numéricos para int (evita TypeError em show(int $id))
+                $params = array_map(function($v) {
+                    return is_numeric($v) ? (int)$v : $v;
+                }, $matches);
+
                 if (is_callable($route['handler'])) {
-                    try { call_user_func_array($route['handler'], $matches); }
+                    try { call_user_func_array($route['handler'], $params); }
                     catch (\Throwable $e) { self::handleError($e); }
                     return;
                 }
@@ -51,11 +56,7 @@ class Router {
                 [$controllerName, $action] = explode('@', $route['handler']);
 
                 // Suporte a controllers em subpastas (Platform\NomeController)
-                if (strpos($controllerName, '\\') !== false) {
-                    $class = "App\\Controllers\\{$controllerName}";
-                } else {
-                    $class = "App\\Controllers\\{$controllerName}";
-                }
+                $class = "App\\Controllers\\{$controllerName}";
 
                 if (!class_exists($class)) {
                     Logger::error("Controller não encontrado: {$class}");
@@ -66,7 +67,7 @@ class Router {
 
                 try {
                     $controller = new $class();
-                    call_user_func_array([$controller, $action], $matches);
+                    call_user_func_array([$controller, $action], $params);
                 } catch (\Throwable $e) {
                     self::handleError($e);
                 }

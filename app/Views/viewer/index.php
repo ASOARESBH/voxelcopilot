@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Viewer DICOM', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <div class="page-content">
 
@@ -82,4 +81,3 @@ function abrirViewer() {
 document.getElementById('studyUidInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') abrirViewer(); });
 </script>
 
-<?php $this->layout('layout/copilot_footer'); ?>

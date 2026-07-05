@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Integrações', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <div class="page-content">
   <div class="integracoes-lista">
@@ -70,4 +69,3 @@ async function testarConexao(id, tipo, url) {
 }
 </script>
 
-<?php $this->layout('layout/copilot_footer'); ?>

@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Copilot IA', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <div class="page-content">
   <div class="copilot-layout">
@@ -204,4 +203,3 @@ function toggleVoz() {
 }
 </script>
 
-<?php $this->layout('layout/copilot_footer'); ?>

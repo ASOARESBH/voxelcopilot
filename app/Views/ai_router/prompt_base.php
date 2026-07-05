@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', $data); ?>
 <style>
 .air-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;}
 .air-nav-btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;border:1px solid #e2e8f0;background:#fff;color:#374151;text-decoration:none;transition:all .15s;}
@@ -139,4 +138,3 @@ function inserirVariavel(v){const t=document.getElementById('pConteudo');const s
 function salvarPrompt(e){e.preventDefault();const fd=new FormData(e.target);fetch('/ai-router/prompt-base/salvar',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.ok){fecharModal();location.reload();}else{alert('Erro: '+(d.erro||'Falha'));}});}
 function duplicarPrompt(id){fetch('/ai-router/prompt-base/duplicar',{method:'POST',body:new URLSearchParams({id,csrf_token:'<?= $data['csrf_token'] ?>'})}).then(r=>r.json()).then(d=>{if(d.ok)location.reload();});}
 </script>
-<?php $this->layout('layout/copilot_footer', $data); ?>

@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', $data); ?>
 
 <style>
 .air-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;}
@@ -328,4 +327,3 @@ function testarProvider(id) {
 selecionarTipo('openai');
 </script>
 
-<?php $this->layout('layout/copilot_footer', $data); ?>

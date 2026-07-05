@@ -10,6 +10,23 @@ use App\Services\CopilotAIService;
 
 class WorkspaceController extends Controller {
 
+    /**
+     * Retorna WHERE clause e params compatíveis com modo standalone (sem tenant).
+     * Em modo standalone, filtra apenas por medico_id.
+     */
+    private function buildOwnerFilter(int $medicoId, ?int $tenantId, string $alias = 'l'): array {
+        if ($tenantId) {
+            return [
+                'where'  => "{$alias}.medico_id = :mid AND {$alias}.tenant_id = :tid",
+                'params' => ['mid' => $medicoId, 'tid' => $tenantId],
+            ];
+        }
+        return [
+            'where'  => "{$alias}.medico_id = :mid",
+            'params' => ['mid' => $medicoId],
+        ];
+    }
+
     public function index(): void {
         TenantMiddleware::handle();
         $pdo      = Database::getInstance();
@@ -22,11 +39,12 @@ class WorkspaceController extends Controller {
         $status  = $_GET['status'] ?? '';
         $busca   = trim($_GET['busca'] ?? '');
 
-        $where  = ["l.medico_id = :mid", "l.tenant_id = :tid"];
-        $params = ['mid' => $medicoId, 'tid' => $tenantId];
+        $base   = $this->buildOwnerFilter($medicoId, $tenantId, 'l');
+        $where  = [$base['where']];
+        $params = $base['params'];
 
         if ($status) { $where[] = "l.status = :status"; $params['status'] = $status; }
-        if ($busca)  { $where[] = "(w.patient_nome LIKE :busca OR w.study_uid LIKE :busca)"; $params['busca'] = "%{$busca}%"; }
+        if ($busca)  { $where[] = "(w.patient_nome LIKE :busca OR w.study_uid LIKE :busca2)"; $params['busca'] = "%{$busca}%"; $params['busca2'] = "%{$busca}%"; }
 
         $whereStr = implode(' AND ', $where);
 
@@ -47,46 +65,50 @@ class WorkspaceController extends Controller {
         $laudos = $stmt->fetchAll();
 
         $this->view('workspace/index', [
-            'title'      => 'Laudos — VOXEL Copilot',
-            'pageTitle'  => 'Workspace de Laudos',
-            'pageSubtitle'=> 'Gerencie seus laudos',
-            'laudos'     => $laudos,
-            'total'      => $total,
-            'page'       => $page,
-            'perPage'    => $perPage,
-            'totalPages' => (int) ceil($total / $perPage),
-            'status'     => $status,
-            'busca'      => $busca,
+            'title'        => 'Laudos — VOXEL Copilot',
+            'pageTitle'    => 'Workspace de Laudos',
+            'pageSubtitle' => 'Gerencie seus laudos',
+            'laudos'       => $laudos,
+            'total'        => $total,
+            'page'         => $page,
+            'perPage'      => $perPage,
+            'totalPages'   => (int) ceil($total / $perPage),
+            'status'       => $status,
+            'busca'        => $busca,
         ]);
     }
 
     public function novo(): void {
         TenantMiddleware::handle();
         $pdo      = Database::getInstance();
+        $medicoId = Auth::userId();
         $tenantId = Auth::tenantId();
 
-        // Busca templates disponíveis
-        $templates = $pdo->prepare("
-            SELECT id, nome, modalidade, especialidade
-            FROM cop_templates
-            WHERE tenant_id = :tid AND ativo = 1
-            ORDER BY uso_count DESC, nome ASC
-        ");
-        $templates->execute(['tid' => $tenantId]);
-        $templates = $templates->fetchAll();
+        // Templates disponíveis (por tenant ou por médico em modo standalone)
+        if ($tenantId) {
+            $tplStmt = $pdo->prepare("SELECT id, nome, modalidade, especialidade FROM cop_templates WHERE tenant_id = :tid AND ativo = 1 ORDER BY uso_count DESC, nome ASC");
+            $tplStmt->execute(['tid' => $tenantId]);
+        } else {
+            $tplStmt = $pdo->prepare("SELECT id, nome, modalidade, especialidade FROM cop_templates WHERE user_id = :uid AND ativo = 1 ORDER BY uso_count DESC, nome ASC");
+            $tplStmt->execute(['uid' => $medicoId]);
+        }
+        $templates = $tplStmt->fetchAll();
 
-        // Busca configuração do PACS do tenant
-        $pacsConfig = $pdo->prepare("SELECT pacs_api_url, pacs_api_token FROM cop_tenants WHERE id = :id LIMIT 1");
-        $pacsConfig->execute(['id' => $tenantId]);
-        $pacsConfig = $pacsConfig->fetch();
+        // Config PACS
+        $pacsConfig = null;
+        if ($tenantId) {
+            $pacsStmt = $pdo->prepare("SELECT pacs_api_url, pacs_api_token FROM cop_tenants WHERE id = :id LIMIT 1");
+            $pacsStmt->execute(['id' => $tenantId]);
+            $pacsConfig = $pacsStmt->fetch();
+        }
 
         $this->view('workspace/novo', [
-            'title'      => 'Novo Laudo — VOXEL Copilot',
-            'pageTitle'  => 'Novo Laudo',
-            'pageSubtitle'=> 'Assistido por IA',
-            'templates'  => $templates,
-            'pacsConfig' => $pacsConfig,
-            'csrf_token' => $this->csrfToken(),
+            'title'        => 'Novo Laudo — VOXEL Copilot',
+            'pageTitle'    => 'Novo Laudo',
+            'pageSubtitle' => 'Assistido por IA',
+            'templates'    => $templates,
+            'pacsConfig'   => $pacsConfig,
+            'csrf_token'   => $this->csrfToken(),
         ]);
     }
 
@@ -123,12 +145,11 @@ class WorkspaceController extends Controller {
         // Carrega template se selecionado
         $corpo = '';
         if ($templateId) {
-            $tpl = $pdo->prepare("SELECT corpo FROM cop_templates WHERE id = :id AND tenant_id = :tid LIMIT 1");
-            $tpl->execute(['id' => $templateId, 'tid' => $tenantId]);
+            $tpl = $pdo->prepare("SELECT corpo FROM cop_templates WHERE id = :id LIMIT 1");
+            $tpl->execute(['id' => $templateId]);
             $tpl = $tpl->fetch();
             if ($tpl) {
-                $corpo = $tpl->corpo;
-                // Incrementa uso do template
+                $corpo = $tpl->corpo ?? '';
                 $pdo->prepare("UPDATE cop_templates SET uso_count = uso_count + 1 WHERE id = :id")->execute(['id' => $templateId]);
             }
         }
@@ -138,10 +159,10 @@ class WorkspaceController extends Controller {
             INSERT INTO cop_laudos (workspace_id, tenant_id, medico_id, versao, achados, status, created_at, updated_at)
             VALUES (:wid, :tid, :mid, 1, :achados, 'rascunho', NOW(), NOW())
         ")->execute([
-            'wid'    => $workspaceId,
-            'tid'    => $tenantId,
-            'mid'    => $medicoId,
-            'achados'=> $corpo,
+            'wid'     => $workspaceId,
+            'tid'     => $tenantId,
+            'mid'     => $medicoId,
+            'achados' => $corpo,
         ]);
         $laudoId = (int) $pdo->lastInsertId();
 
@@ -154,32 +175,49 @@ class WorkspaceController extends Controller {
         $medicoId = Auth::userId();
         $tenantId = Auth::tenantId();
 
-        $stmt = $pdo->prepare("
-            SELECT l.*, w.study_uid, w.patient_nome, w.patient_uid, w.modalidade
-            FROM cop_laudos l
-            JOIN cop_workspaces w ON w.id = l.workspace_id
-            WHERE l.id = :id AND l.medico_id = :mid AND l.tenant_id = :tid
-            LIMIT 1
-        ");
-        $stmt->execute(['id' => $id, 'mid' => $medicoId, 'tid' => $tenantId]);
+        // Busca laudo — tolerante a tenant nulo (modo standalone)
+        if ($tenantId) {
+            $stmt = $pdo->prepare("
+                SELECT l.*, w.study_uid, w.patient_nome, w.patient_uid, w.modalidade
+                FROM cop_laudos l
+                JOIN cop_workspaces w ON w.id = l.workspace_id
+                WHERE l.id = :id AND l.medico_id = :mid AND l.tenant_id = :tid
+                LIMIT 1
+            ");
+            $stmt->execute(['id' => $id, 'mid' => $medicoId, 'tid' => $tenantId]);
+        } else {
+            $stmt = $pdo->prepare("
+                SELECT l.*, w.study_uid, w.patient_nome, w.patient_uid, w.modalidade
+                FROM cop_laudos l
+                JOIN cop_workspaces w ON w.id = l.workspace_id
+                WHERE l.id = :id AND l.medico_id = :mid
+                LIMIT 1
+            ");
+            $stmt->execute(['id' => $id, 'mid' => $medicoId]);
+        }
         $laudo = $stmt->fetch();
 
         if (!$laudo) $this->redirect('/workspace');
 
         // Templates para troca rápida
-        $templates = $pdo->prepare("SELECT id, nome, modalidade FROM cop_templates WHERE tenant_id = :tid AND ativo = 1 ORDER BY uso_count DESC LIMIT 20");
-        $templates->execute(['tid' => $tenantId]);
-        $templates = $templates->fetchAll();
+        if ($tenantId) {
+            $tplStmt = $pdo->prepare("SELECT id, nome, modalidade, especialidade FROM cop_templates WHERE tenant_id = :tid AND ativo = 1 ORDER BY uso_count DESC LIMIT 20");
+            $tplStmt->execute(['tid' => $tenantId]);
+        } else {
+            $tplStmt = $pdo->prepare("SELECT id, nome, modalidade, especialidade FROM cop_templates WHERE user_id = :uid AND ativo = 1 ORDER BY uso_count DESC LIMIT 20");
+            $tplStmt->execute(['uid' => $medicoId]);
+        }
+        $templates = $tplStmt->fetchAll();
 
         // Autotextos
-        $autotextos = $pdo->prepare("
-            SELECT atalho, texto FROM cop_autotextos
-            WHERE tenant_id = :tid AND ativo = 1
-              AND (user_id IS NULL OR user_id = :uid)
-            ORDER BY atalho ASC
-        ");
-        $autotextos->execute(['tid' => $tenantId, 'uid' => $medicoId]);
-        $autotextos = $autotextos->fetchAll();
+        if ($tenantId) {
+            $atStmt = $pdo->prepare("SELECT atalho, texto FROM cop_autotextos WHERE tenant_id = :tid AND ativo = 1 AND (user_id IS NULL OR user_id = :uid) ORDER BY atalho ASC");
+            $atStmt->execute(['tid' => $tenantId, 'uid' => $medicoId]);
+        } else {
+            $atStmt = $pdo->prepare("SELECT atalho, texto FROM cop_autotextos WHERE user_id = :uid AND ativo = 1 ORDER BY atalho ASC");
+            $atStmt->execute(['uid' => $medicoId]);
+        }
+        $autotextos = $atStmt->fetchAll();
 
         // Histórico de conversa com IA
         $conversas = $pdo->prepare("
@@ -191,15 +229,27 @@ class WorkspaceController extends Controller {
         $conversas->execute(['wid' => $laudo->workspace_id]);
         $conversas = $conversas->fetchAll();
 
+        // URL do viewer PACS
+        $pacsViewerUrl = '';
+        if ($tenantId) {
+            $pacsStmt = $pdo->prepare("SELECT pacs_api_url FROM cop_tenants WHERE id = :id LIMIT 1");
+            $pacsStmt->execute(['id' => $tenantId]);
+            $pacsRow = $pacsStmt->fetch();
+            if ($pacsRow && $pacsRow->pacs_api_url) {
+                $pacsViewerUrl = rtrim($pacsRow->pacs_api_url, '/') . '/viewer?study_uid=' . urlencode($laudo->study_uid ?? '');
+            }
+        }
+
         $this->view('workspace/show', [
-            'title'      => 'Laudo — VOXEL Copilot',
-            'pageTitle'  => 'Editor de Laudo',
-            'pageSubtitle'=> $laudo->patient_nome ?? $laudo->study_uid,
-            'laudo'      => $laudo,
-            'templates'  => $templates,
-            'autotextos' => $autotextos,
-            'conversas'  => $conversas,
-            'csrf_token' => $this->csrfToken(),
+            'title'         => 'Laudo — VOXEL Copilot',
+            'pageTitle'     => 'Editor de Laudo',
+            'pageSubtitle'  => $laudo->patient_nome ?? $laudo->study_uid ?? 'Novo Laudo',
+            'laudo'         => $laudo,
+            'templates'     => $templates,
+            'autotextos'    => $autotextos,
+            'conversas'     => $conversas,
+            'pacsViewerUrl' => $pacsViewerUrl,
+            'csrf_token'    => $this->csrfToken(),
         ]);
     }
 
@@ -209,10 +259,18 @@ class WorkspaceController extends Controller {
         $medicoId = Auth::userId();
         $tenantId = Auth::tenantId();
 
-        $stmt = $pdo->prepare("SELECT id FROM cop_laudos WHERE id = :id AND medico_id = :mid AND tenant_id = :tid AND status = 'rascunho' LIMIT 1");
-        $stmt->execute(['id' => $id, 'mid' => $medicoId, 'tid' => $tenantId]);
+        // Verifica posse do laudo (tolerante a tenant nulo)
+        if ($tenantId) {
+            $stmt = $pdo->prepare("SELECT id FROM cop_laudos WHERE id = :id AND medico_id = :mid AND tenant_id = :tid AND status = 'rascunho' LIMIT 1");
+            $stmt->execute(['id' => $id, 'mid' => $medicoId, 'tid' => $tenantId]);
+        } else {
+            $stmt = $pdo->prepare("SELECT id FROM cop_laudos WHERE id = :id AND medico_id = :mid AND status = 'rascunho' LIMIT 1");
+            $stmt->execute(['id' => $id, 'mid' => $medicoId]);
+        }
+
         if (!$stmt->fetch()) {
             $this->json(['ok' => false, 'msg' => 'Laudo não encontrado ou já assinado.'], 403);
+            return;
         }
 
         $pdo->prepare("
@@ -227,12 +285,12 @@ class WorkspaceController extends Controller {
             WHERE id = :id
         ")->execute([
             'id'          => $id,
-            'indicacao'   => $_POST['indicacao']   ?? null,
-            'tecnica'     => $_POST['tecnica']     ?? null,
-            'achados'     => $_POST['achados']     ?? null,
-            'impressao'   => $_POST['impressao']   ?? null,
-            'recomendacao'=> $_POST['recomendacao']?? null,
-            'cid'         => $_POST['cid']         ?? null,
+            'indicacao'   => $_POST['indicacao']    ?? null,
+            'tecnica'     => $_POST['tecnica']      ?? null,
+            'achados'     => $_POST['achados']      ?? null,
+            'impressao'   => $_POST['impressao']    ?? null,
+            'recomendacao'=> $_POST['recomendacao'] ?? null,
+            'cid'         => $_POST['cid']          ?? null,
         ]);
 
         $this->json(['ok' => true, 'msg' => 'Laudo salvo com sucesso.']);
@@ -244,10 +302,18 @@ class WorkspaceController extends Controller {
         $medicoId = Auth::userId();
         $tenantId = Auth::tenantId();
 
-        $stmt = $pdo->prepare("SELECT id FROM cop_laudos WHERE id = :id AND medico_id = :mid AND tenant_id = :tid AND status = 'rascunho' LIMIT 1");
-        $stmt->execute(['id' => $id, 'mid' => $medicoId, 'tid' => $tenantId]);
+        // Verifica posse do laudo (tolerante a tenant nulo)
+        if ($tenantId) {
+            $stmt = $pdo->prepare("SELECT id FROM cop_laudos WHERE id = :id AND medico_id = :mid AND tenant_id = :tid AND status = 'rascunho' LIMIT 1");
+            $stmt->execute(['id' => $id, 'mid' => $medicoId, 'tid' => $tenantId]);
+        } else {
+            $stmt = $pdo->prepare("SELECT id FROM cop_laudos WHERE id = :id AND medico_id = :mid AND status = 'rascunho' LIMIT 1");
+            $stmt->execute(['id' => $id, 'mid' => $medicoId]);
+        }
+
         if (!$stmt->fetch()) {
             $this->json(['ok' => false, 'msg' => 'Laudo não encontrado ou já assinado.'], 403);
+            return;
         }
 
         $pdo->prepare("
@@ -255,12 +321,16 @@ class WorkspaceController extends Controller {
             WHERE id = :id
         ")->execute(['id' => $id]);
 
-        // Atualiza contagem no perfil
-        $pdo->prepare("
-            INSERT INTO cop_medico_perfil (user_id, tenant_id, total_laudos)
-            VALUES (:uid, :tid, 1)
-            ON DUPLICATE KEY UPDATE total_laudos = total_laudos + 1, updated_at = NOW()
-        ")->execute(['uid' => $medicoId, 'tid' => $tenantId]);
+        // Atualiza contagem no perfil (tolerante a tenant nulo)
+        try {
+            $pdo->prepare("
+                INSERT INTO cop_medico_perfil (user_id, tenant_id, total_laudos)
+                VALUES (:uid, :tid, 1)
+                ON DUPLICATE KEY UPDATE total_laudos = total_laudos + 1, updated_at = NOW()
+            ")->execute(['uid' => $medicoId, 'tid' => $tenantId ?? 0]);
+        } catch (\Exception $e) {
+            // Não bloqueia a assinatura se o perfil falhar
+        }
 
         $this->json(['ok' => true, 'msg' => 'Laudo assinado com sucesso.']);
     }

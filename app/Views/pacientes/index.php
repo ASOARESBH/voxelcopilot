@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Pacientes', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <div class="page-content">
 
@@ -94,4 +93,3 @@
 .page-btn:hover, .page-btn.active { background:#1a56db; color:#fff; border-color:#1a56db; }
 </style>
 
-<?php $this->layout('layout/copilot_footer'); ?>

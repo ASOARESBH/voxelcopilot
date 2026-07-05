@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Template', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <?php
 $isEdicao = !is_null($template);
@@ -123,4 +122,3 @@ function prepararEstrutura() {
 }
 </script>
 
-<?php $this->layout('layout/copilot_footer'); ?>

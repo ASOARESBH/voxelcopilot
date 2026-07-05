@@ -10,7 +10,7 @@ use App\Services\AiRouterService;
 class AiRouterController extends Controller {
 
     private function pdo() { return Database::getInstance(); }
-    private function uid() { return Auth::id(); }
+    private function uid() { return Auth::userId(); }
 
     // ─── 1. DASHBOARD ────────────────────────────────────────────────────────────
 

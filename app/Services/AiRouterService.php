@@ -28,7 +28,7 @@ class AiRouterService {
      */
     public static function route(array $params): array {
         $startTime = microtime(true);
-        $userId    = Auth::id();
+        $userId    = Auth::userId();
         $tenantId  = Auth::tenantId();
 
         // Resolve provider — usa rota inteligente se não especificado

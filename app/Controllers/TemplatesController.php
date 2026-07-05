@@ -77,16 +77,17 @@ class TemplatesController extends Controller {
             return;
         }
 
+        $corpo = trim($_POST['corpo'] ?? $_POST['estrutura'] ?? '');
+
         $pdo->prepare("
-            INSERT INTO cop_templates (tenant_id, medico_id, nome, modalidade, estrutura_json, publico, ativo, uso_count, created_at, updated_at)
-            VALUES (:tid, :mid, :nome, :mod, :estrutura, :publico, 1, 0, NOW(), NOW())
+            INSERT INTO cop_templates (tenant_id, user_id, nome, modalidade, corpo, ativo, uso_count, created_at, updated_at)
+            VALUES (:tid, :uid, :nome, :mod, :corpo, 1, 0, NOW(), NOW())
         ")->execute([
-            'tid'      => $tenantId,
-            'mid'      => $medicoId,
-            'nome'     => $nome,
-            'mod'      => $modalidade,
-            'estrutura'=> $estrutura,
-            'publico'  => $publico,
+            'tid'  => $tenantId,
+            'uid'  => $medicoId,
+            'nome' => $nome,
+            'mod'  => $modalidade,
+            'corpo'=> $corpo,
         ]);
 
         header('Location: /templates?sucesso=criado');
@@ -167,6 +168,41 @@ class TemplatesController extends Controller {
 
         header('Location: /templates?sucesso=excluido');
         exit;
+    }
+
+    // API: retorna apenas o corpo do template (AJAX para workspace)
+    public function getCorpo(int $id): void {
+        AuthMiddleware::handle();
+        header('Content-Type: application/json');
+
+        $pdo      = Database::getInstance();
+        $medicoId = Auth::userId();
+        $tenantId = Auth::tenantId();
+
+        if ($tenantId) {
+            $stmt = $pdo->prepare("SELECT id, nome, modalidade, corpo FROM cop_templates WHERE id = :id AND tenant_id = :tid AND ativo = 1 LIMIT 1");
+            $stmt->execute(['id' => $id, 'tid' => $tenantId]);
+        } else {
+            $stmt = $pdo->prepare("SELECT id, nome, modalidade, corpo FROM cop_templates WHERE id = :id AND user_id = :uid AND ativo = 1 LIMIT 1");
+            $stmt->execute(['id' => $id, 'uid' => $medicoId]);
+        }
+        $template = $stmt->fetch();
+
+        if (!$template) {
+            // Fallback: templates default em modo standalone
+            $defaults = $this->getTemplatesDefault();
+            foreach ($defaults as $t) {
+                if ($t['id'] == $id) {
+                    $estrutura = json_decode($t['estrutura_json'], true);
+                    echo json_encode(['ok' => true, 'corpo' => $estrutura['achados'] ?? '', 'nome' => $t['nome']]);
+                    return;
+                }
+            }
+            echo json_encode(['ok' => false, 'error' => 'Template nao encontrado']);
+            return;
+        }
+
+        echo json_encode(['ok' => true, 'corpo' => $template->corpo ?? '', 'nome' => $template->nome ?? '']);
     }
 
     // API: buscar template por ID (AJAX)

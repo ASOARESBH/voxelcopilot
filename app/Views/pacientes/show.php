@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Paciente', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <div class="page-content">
 
@@ -99,4 +98,3 @@
 @media(max-width:768px) { .grid-2-1 { grid-template-columns:1fr; } .detail-grid { grid-template-columns:1fr; } }
 </style>
 
-<?php $this->layout('layout/copilot_footer'); ?>

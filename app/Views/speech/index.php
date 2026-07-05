@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Speech', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <div class="page-content">
   <div class="speech-layout">
@@ -169,4 +168,3 @@ function usarNoWorkspace() {
 }
 </script>
 
-<?php $this->layout('layout/copilot_footer'); ?>

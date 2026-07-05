@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Configurações', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <div class="page-content">
 
@@ -200,4 +199,3 @@ function salvarAssinatura() {
 }
 </script>
 
-<?php $this->layout('layout/copilot_footer'); ?>

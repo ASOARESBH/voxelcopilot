@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Timeline Clínica', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <div class="page-content">
 
@@ -56,4 +55,3 @@
 .mini-dot--atual { background:#1a56db; width:16px; height:16px; box-shadow:0 0 0 3px rgba(26,86,219,.2); }
 </style>
 
-<?php $this->layout('layout/copilot_footer'); ?>

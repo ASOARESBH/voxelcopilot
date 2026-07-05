@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', $data); ?>
 <style>
 .mp-tabs{display:flex;gap:4px;border-bottom:2px solid #e2e8f0;margin-bottom:24px;}
 .mp-tab{padding:10px 20px;font-size:14px;font-weight:500;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;}
@@ -370,4 +369,3 @@ function excluirAutotexto(id) {
     }).then(r => r.json()).then(d => { if (d.ok) location.reload(); });
 }
 </script>
-<?php $this->layout('layout/copilot_footer', $data); ?>

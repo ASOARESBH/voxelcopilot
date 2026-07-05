@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Templates', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <div class="page-content">
 
@@ -84,4 +83,3 @@
 .template-actions { display:flex; gap:8px; margin-top:auto; }
 </style>
 
-<?php $this->layout('layout/copilot_footer'); ?>

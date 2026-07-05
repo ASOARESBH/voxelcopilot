@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Analytics', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <div class="page-content">
 
@@ -145,4 +144,3 @@ new Chart(document.getElementById('chartLaudosDia'), {
 });
 </script>
 
-<?php $this->layout('layout/copilot_footer'); ?>

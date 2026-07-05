@@ -3,13 +3,13 @@ namespace App\Controllers;
 
 use App\Core\Auth;
 use App\Core\Controller;
-use App\Middlewares\TenantMiddleware;
+use App\Middlewares\AuthMiddleware;
 use App\Services\CopilotAIService;
 
 class CopilotApiController extends Controller {
 
     public function chat(): void {
-        TenantMiddleware::handle();
+        AuthMiddleware::handle();
 
         $workspaceId = (int)($_POST['workspace_id'] ?? 0);
         $mensagem    = trim($_POST['mensagem'] ?? '');
@@ -25,7 +25,7 @@ class CopilotApiController extends Controller {
     }
 
     public function sugestao(): void {
-        TenantMiddleware::handle();
+        AuthMiddleware::handle();
 
         $workspaceId = (int)($_POST['workspace_id'] ?? 0);
         $modalidade  = trim($_POST['modalidade']   ?? '');

@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', ['title' => $title ?? 'Marketplace', 'pageTitle' => $pageTitle, 'pageSubtitle' => $pageSubtitle]); ?>
 
 <div class="page-content">
   <div class="marketplace-grid">
@@ -50,4 +49,3 @@
 .plugin-actions { margin-top:4px; }
 </style>
 
-<?php $this->layout('layout/copilot_footer'); ?>

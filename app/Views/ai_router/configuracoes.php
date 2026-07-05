@@ -1,4 +1,3 @@
-<?php $this->layout('layout/copilot_header', $data); ?>
 <style>
 .air-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;}
 .air-nav-btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;border:1px solid #e2e8f0;background:#fff;color:#374151;text-decoration:none;transition:all .15s;}
@@ -122,4 +121,3 @@
         <button type="submit" class="btn-primary">💾 Salvar Configurações</button>
     </div>
 </form>
-<?php $this->layout('layout/copilot_footer', $data); ?>
