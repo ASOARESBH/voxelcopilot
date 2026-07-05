@@ -99,9 +99,9 @@ if ($user) {
     </div>
 
     <?php else: ?>
-    <!-- ── NAV MÉDICO ── -->
+    <!-- ── NAV MÉDICO — Menu Definitivo ── -->
     <div class="sidebar-section">
-        <div class="sidebar-section-label">Workspace</div>
+        <div class="sidebar-section-label">Central de Trabalho</div>
         <ul class="sidebar-nav">
             <li>
                 <a href="/dashboard" class="<?= $currentUri === '/dashboard' ? 'active' : '' ?>">
@@ -110,7 +110,54 @@ if ($user) {
             </li>
             <li>
                 <a href="/workspace" class="<?= str_starts_with($currentUri, '/workspace') ? 'active' : '' ?>">
-                    <i class="fa-solid fa-file-medical" aria-hidden="true"></i> Laudos
+                    <i class="fa-solid fa-desktop" aria-hidden="true"></i> Meu Workspace
+                </a>
+            </li>
+            <li>
+                <a href="/fila" class="<?= str_starts_with($currentUri, '/fila') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-list-check" aria-hidden="true"></i> Fila Inteligente
+                    <span class="sidebar-badge">18</span>
+                </a>
+            </li>
+            <li>
+                <a href="/pacientes" class="<?= str_starts_with($currentUri, '/pacientes') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-users" aria-hidden="true"></i> Pacientes
+                </a>
+            </li>
+            <li>
+                <a href="/timeline" class="<?= str_starts_with($currentUri, '/timeline') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-timeline" aria-hidden="true"></i> Timeline Clínica
+                </a>
+            </li>
+            <li>
+                <a href="/comparativos" class="<?= str_starts_with($currentUri, '/comparativos') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-code-compare" aria-hidden="true"></i> Comparativos
+                </a>
+            </li>
+            <li>
+                <a href="/viewer" class="<?= str_starts_with($currentUri, '/viewer') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-image" aria-hidden="true"></i> Viewer
+                </a>
+            </li>
+        </ul>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-label">Inteligência</div>
+        <ul class="sidebar-nav">
+            <li>
+                <a href="/copilot" class="<?= str_starts_with($currentUri, '/copilot') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-brain" aria-hidden="true"></i> Copilot IA
+                    <span class="sidebar-badge sidebar-badge-blue">12</span>
+                </a>
+            </li>
+            <li>
+                <a href="/vision" class="<?= str_starts_with($currentUri, '/vision') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-eye" aria-hidden="true"></i> Vision AI
+                </a>
+            </li>
+            <li>
+                <a href="/speech" class="<?= str_starts_with($currentUri, '/speech') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-microphone" aria-hidden="true"></i> Speech
                 </a>
             </li>
             <li>
@@ -119,23 +166,33 @@ if ($user) {
                 </a>
             </li>
             <li>
-                <a href="/autotextos" class="<?= str_starts_with($currentUri, '/autotextos') ? 'active' : '' ?>">
-                    <i class="fa-solid fa-bolt" aria-hidden="true"></i> Autotextos
+                <a href="/pesquisa" class="<?= str_starts_with($currentUri, '/pesquisa') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-flask" aria-hidden="true"></i> Pesquisa Clínica
                 </a>
             </li>
         </ul>
     </div>
     <div class="sidebar-section">
-        <div class="sidebar-section-label">Configurações</div>
+        <div class="sidebar-section-label">Gestão</div>
         <ul class="sidebar-nav">
             <li>
-                <a href="/perfil" class="<?= str_starts_with($currentUri, '/perfil') ? 'active' : '' ?>">
-                    <i class="fa-solid fa-user-gear" aria-hidden="true"></i> Meu Perfil
+                <a href="/analytics" class="<?= str_starts_with($currentUri, '/analytics') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-chart-bar" aria-hidden="true"></i> Analytics
                 </a>
             </li>
             <li>
-                <a href="/pacs" class="<?= str_starts_with($currentUri, '/pacs') ? 'active' : '' ?>">
-                    <i class="fa-solid fa-server" aria-hidden="true"></i> Conexão PACS
+                <a href="/marketplace" class="<?= str_starts_with($currentUri, '/marketplace') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-store" aria-hidden="true"></i> Marketplace
+                </a>
+            </li>
+            <li>
+                <a href="/integracoes" class="<?= str_starts_with($currentUri, '/integracoes') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-plug" aria-hidden="true"></i> Integrações
+                </a>
+            </li>
+            <li>
+                <a href="/configuracoes" class="<?= str_starts_with($currentUri, '/configuracoes') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-gear" aria-hidden="true"></i> Configurações
                 </a>
             </li>
         </ul>

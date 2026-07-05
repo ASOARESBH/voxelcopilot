@@ -245,6 +245,35 @@ input, textarea, select { font-family: var(--font-body); }
   border-radius: 0 3px 3px 0;
 }
 
+/* Badges de contagem na sidebar */
+.sidebar-badge {
+  margin-left: auto;
+  background: rgba(239,68,68,.85);
+  color: #fff;
+  font-size: .6rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 100px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.6;
+}
+.sidebar-badge-blue {
+  background: var(--royal);
+  color: #fff;
+}
+
+/* Scroll na sidebar quando menu é longo */
+.sidebar-nav-wrap {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.1) transparent;
+}
+.sidebar-nav-wrap::-webkit-scrollbar { width: 3px; }
+.sidebar-nav-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 2px; }
+
 /* Usuário no rodapé da sidebar */
 .sidebar-footer {
   margin-top: auto;
