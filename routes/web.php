@@ -102,6 +102,43 @@ Router::get('/platform/planos',      'Platform\PlatformController@planos');
 Router::get('/platform/impersonar/{id}', 'Platform\PlatformController@impersonate');
 Router::get('/platform/sair-impersonacao', 'Platform\PlatformController@exitImpersonate');
 
+// ─── AI ROUTER ───────────────────────────────────────────────────────────────
+Router::get('/ai-router',                        'AiRouterController@dashboard');
+Router::get('/ai-router/providers',              'AiRouterController@providers');
+Router::post('/ai-router/providers/salvar',      'AiRouterController@salvarProvider');
+Router::post('/ai-router/providers/excluir',     'AiRouterController@excluirProvider');
+Router::post('/ai-router/providers/testar',      'AiRouterController@testarProvider');
+Router::get('/ai-router/modelos',                'AiRouterController@modelos');
+Router::post('/ai-router/modelos/salvar',        'AiRouterController@salvarModelo');
+Router::get('/ai-router/prompt-base',            'AiRouterController@promptBase');
+Router::post('/ai-router/prompt-base/salvar',    'AiRouterController@salvarPromptBase');
+Router::post('/ai-router/prompt-base/excluir',   'AiRouterController@excluirPromptBase');
+Router::get('/ai-router/prompt-templates',       'AiRouterController@promptTemplates');
+Router::post('/ai-router/prompt-templates/salvar',   'AiRouterController@salvarPromptTemplate');
+Router::post('/ai-router/prompt-templates/duplicar', 'AiRouterController@duplicarPromptTemplate');
+Router::get('/ai-router/rotas',                  'AiRouterController@rotas');
+Router::post('/ai-router/rotas/salvar',          'AiRouterController@salvarRota');
+Router::post('/ai-router/rotas/excluir',         'AiRouterController@excluirRota');
+Router::get('/ai-router/historico',              'AiRouterController@historico');
+Router::get('/ai-router/tokens',                 'AiRouterController@tokens');
+Router::get('/ai-router/custos',                 'AiRouterController@custos');
+Router::get('/ai-router/logs',                   'AiRouterController@logs');
+Router::get('/ai-router/testes',                 'AiRouterController@testes');
+Router::get('/ai-router/configuracoes',          'AiRouterController@configuracoes');
+Router::post('/ai-router/configuracoes/salvar',  'AiRouterController@salvarConfiguracoes');
+
+// ─── MEDICAL PROFILE ──────────────────────────────────────────────────────────
+Router::get('/medical-profile',                       'MedicalProfileController@index');
+Router::post('/medical-profile/salvar',               'MedicalProfileController@salvar');
+Router::post('/medical-profile/autotexto/salvar',     'MedicalProfileController@salvarAutotexto');
+Router::post('/medical-profile/autotexto/excluir',    'MedicalProfileController@excluirAutotexto');
+Router::get('/api/medical-profile/autotextos',        'MedicalProfileController@getAutotextos');
+Router::post('/api/medical-profile/uso-autotexto',    'MedicalProfileController@registrarUsoAutotexto');
+Router::get('/api/medical-profile/perfil',            'MedicalProfileController@getPerfil');
+
+// ─── API AI ROUTER (AJAX) ─────────────────────────────────────────────────────
+Router::post('/api/ai/router',                        'AiRouterController@apiRouter');
+
 // ─── API PACS (AJAX) ───────────────────────────────────────────────────────
 Router::get('/api/pacs/buscar',           'PacsController@buscar');
 

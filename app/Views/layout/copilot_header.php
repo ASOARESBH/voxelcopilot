@@ -170,6 +170,11 @@ if ($user) {
                     <i class="fa-solid fa-flask" aria-hidden="true"></i> Pesquisa Clínica
                 </a>
             </li>
+            <li>
+                <a href="/medical-profile" class="<?= str_starts_with($currentUri, '/medical-profile') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-user-gear" aria-hidden="true"></i> Medical Profile
+                </a>
+            </li>
         </ul>
     </div>
     <div class="sidebar-section">
@@ -178,6 +183,12 @@ if ($user) {
             <li>
                 <a href="/analytics" class="<?= str_starts_with($currentUri, '/analytics') ? 'active' : '' ?>">
                     <i class="fa-solid fa-chart-bar" aria-hidden="true"></i> Analytics
+                </a>
+            </li>
+            <li>
+                <a href="/ai-router" class="<?= str_starts_with($currentUri, '/ai-router') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-route" aria-hidden="true"></i> AI Router
+                    <span class="sidebar-badge sidebar-badge-blue" style="background:#7c3aed;">IA</span>
                 </a>
             </li>
             <li>
