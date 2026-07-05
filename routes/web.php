@@ -18,7 +18,7 @@ Router::get('/dashboard',            'DashboardController@index');
 Router::get('/workspace',            'WorkspaceController@index');
 Router::get('/workspace/novo',       'WorkspaceController@novo');
 Router::post('/workspace/novo',      'WorkspaceController@criar');
-Router::get('/workspace/laudo/{id}', 'WorkspaceController@laudoShow');
+// Rota removida — use /workspace/{id} diretamente
 Router::get('/workspace/{id}',       'WorkspaceController@show');
 Router::post('/workspace/{id}/salvar',  'WorkspaceController@salvar');
 Router::post('/workspace/{id}/assinar', 'WorkspaceController@assinar');
@@ -101,6 +101,12 @@ Router::get('/platform/medicos/{id}/toggle-status', 'Platform\PlatformController
 Router::get('/platform/planos',      'Platform\PlatformController@planos');
 Router::get('/platform/impersonar/{id}', 'Platform\PlatformController@impersonate');
 Router::get('/platform/sair-impersonacao', 'Platform\PlatformController@exitImpersonate');
+
+// ─── API PACS (AJAX) ───────────────────────────────────────────────────────
+Router::get('/api/pacs/buscar',           'PacsController@buscar');
+
+// ─── API TEMPLATES (AJAX) ───────────────────────────────────────────────────
+Router::get('/api/templates/{id}/corpo',  'TemplatesController@getCorpo');
 
 // ─── API COPILOT (AJAX) ──────────────────────────────────────────────────────
 Router::post('/api/copilot/chat',         'CopilotApiController@chat');
