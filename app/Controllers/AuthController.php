@@ -65,11 +65,12 @@ class AuthController extends Controller {
         }
 
         // Médico: verifica tenants
+        // Provisoriamente: médicos sem tenant vão direto ao dashboard
         $tenants = Auth::userTenants();
 
         if (count($tenants) === 0) {
-            Auth::logout();
-            $this->redirect('/login?error=sem_acesso');
+            // Sem tenant vinculado — acesso direto ao dashboard (modo standalone)
+            $this->redirect('/dashboard');
         } elseif (count($tenants) === 1) {
             $this->redirect('/dashboard');
         } else {
