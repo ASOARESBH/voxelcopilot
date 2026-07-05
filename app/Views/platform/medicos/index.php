@@ -75,31 +75,29 @@ function statusBadge(string $status): string {
                 <tr>
                     <td>
                         <div style="display:flex;align-items:center;gap:10px;">
-                            <div style="width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,rgba(14,165,233,.15),rgba(6,182,212,.08));border:1px solid rgba(14,165,233,.15);display:flex;align-items:center;justify-content:center;font-size:.72rem;color:var(--primary);font-weight:700;flex-shrink:0;">
-                                <?= strtoupper(substr($m->name, 0, 2)) ?>
-                            </div>
+                            <div class="avatar avatar-sm avatar-blue"><?= strtoupper(substr($m->name, 0, 2)) ?></div>
                             <div>
-                                <div style="font-weight:600;color:#e2e8f0;"><?= htmlspecialchars($m->name) ?></div>
+                                <div style="font-weight:600;color:var(--gray-800);font-size:.83rem;"><?= htmlspecialchars($m->name) ?></div>
                                 <div style="font-size:.72rem;color:var(--muted);"><?= htmlspecialchars($m->email) ?></div>
                             </div>
                         </div>
                     </td>
                     <td>
                         <?php if ($m->crm): ?>
-                        <code style="font-size:.78rem;color:#7dd3fc;background:rgba(14,165,233,.08);padding:2px 8px;border-radius:4px;">
+                        <span style="font-size:.77rem;font-weight:600;color:var(--gray-700);background:var(--gray-100);border:1px solid var(--border);padding:2px 8px;border-radius:5px;">
                             <?= htmlspecialchars($m->crm) ?>/<?= htmlspecialchars($m->crm_uf ?? '') ?>
-                        </code>
+                        </span>
                         <?php else: ?><span style="color:var(--muted);">—</span><?php endif; ?>
                     </td>
-                    <td style="font-size:.75rem;color:var(--muted);max-width:220px;">
+                    <td style="font-size:.78rem;color:var(--text-2);max-width:220px;">
                         <?= htmlspecialchars($especStr) ?>
                     </td>
-                    <td style="font-size:.78rem;color:var(--muted);">
+                    <td style="font-size:.78rem;color:var(--text-2);">
                         <?php if ($m->cidade): ?>
                         <?= htmlspecialchars($m->cidade) ?>/<?= htmlspecialchars($m->estado ?? '') ?>
                         <?php else: ?>—<?php endif; ?>
                     </td>
-                    <td style="font-size:.75rem;color:var(--muted);">
+                    <td style="font-size:.78rem;color:var(--muted);">
                         <?= $m->ultimo_login ? date('d/m/Y H:i', strtotime($m->ultimo_login)) : 'Nunca' ?>
                     </td>
                     <td><?= statusBadge($m->status) ?></td>

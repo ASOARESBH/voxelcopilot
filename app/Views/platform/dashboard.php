@@ -83,29 +83,27 @@ function statusBadge(string $status): string {
                 <tr>
                     <td>
                         <div style="display:flex;align-items:center;gap:10px;">
-                            <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,rgba(14,165,233,.2),rgba(6,182,212,.1));border:1px solid rgba(14,165,233,.2);display:flex;align-items:center;justify-content:center;font-size:.7rem;color:var(--primary);font-weight:700;flex-shrink:0;">
-                                <?= strtoupper(substr($m->name, 0, 2)) ?>
-                            </div>
+                            <div class="avatar avatar-sm avatar-blue"><?= strtoupper(substr($m->name, 0, 2)) ?></div>
                             <div>
-                                <div style="font-weight:600;color:#e2e8f0;font-size:.85rem;"><?= htmlspecialchars($m->name) ?></div>
+                                <div style="font-weight:600;color:var(--gray-800);font-size:.83rem;"><?= htmlspecialchars($m->name) ?></div>
                                 <div style="font-size:.72rem;color:var(--muted);"><?= htmlspecialchars($m->email) ?></div>
                             </div>
                         </div>
                     </td>
                     <td>
                         <?php if ($m->crm): ?>
-                        <span style="font-size:.78rem;font-family:monospace;color:#7dd3fc;">
+                        <span style="font-size:.77rem;font-weight:600;color:var(--gray-700);background:var(--gray-100);border:1px solid var(--border);padding:2px 8px;border-radius:5px;">
                             <?= htmlspecialchars($m->crm) ?>/<?= htmlspecialchars($m->crm_uf ?? '') ?>
                         </span>
                         <?php else: ?>
                         <span style="color:var(--muted);">—</span>
                         <?php endif; ?>
                     </td>
-                    <td style="font-size:.75rem;color:var(--muted);max-width:200px;">
+                    <td style="font-size:.78rem;color:var(--text-2);max-width:200px;">
                         <?= htmlspecialchars($especStr) ?>
                     </td>
                     <td><?= statusBadge($m->status) ?></td>
-                    <td style="font-size:.75rem;color:var(--muted);">
+                    <td style="font-size:.78rem;color:var(--muted);">
                         <?= date('d/m/Y', strtotime($m->created_at)) ?>
                     </td>
                     <td>
