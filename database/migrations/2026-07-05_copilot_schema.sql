@@ -1,6 +1,12 @@
 -- ============================================================
 -- VOXEL Copilot — Schema Principal
--- MariaDB 5.7 / MySQL 5.7 compatível
+-- 100% compatível com MariaDB 5.7 / MySQL 5.7
+-- HostGator / cPanel / phpMyAdmin
+--
+-- INSTRUÇÕES DE EXECUÇÃO:
+-- Execute este arquivo UMA ÚNICA VEZ em um banco limpo.
+-- Caso precise reexecutar, apague as tabelas manualmente
+-- antes (DROP TABLE) ou use o script de reset abaixo.
 -- ============================================================
 
 SET NAMES utf8mb4;
@@ -9,7 +15,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- ============================================================
 -- PLANOS
 -- ============================================================
-CREATE TABLE IF NOT EXISTS `cop_plans` (
+CREATE TABLE `cop_plans` (
     `id`                    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `nome`                  VARCHAR(100)   NOT NULL,
     `slug`                  VARCHAR(50)    NOT NULL,
@@ -28,7 +34,7 @@ CREATE TABLE IF NOT EXISTS `cop_plans` (
 -- ============================================================
 -- TENANTS (Clínicas / Hospitais)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS `cop_tenants` (
+CREATE TABLE `cop_tenants` (
     `id`                    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `nome`                  VARCHAR(255)   NOT NULL,
     `slug`                  VARCHAR(100)   NOT NULL,
@@ -40,8 +46,8 @@ CREATE TABLE IF NOT EXISTS `cop_tenants` (
     `plan_id`               INT UNSIGNED   NOT NULL,
     `status`                VARCHAR(20)    NOT NULL DEFAULT 'trial',
     `trial_expira_em`       DATE           NULL,
-    `pacs_api_url`          VARCHAR(500)   NULL COMMENT 'URL da API do VOXEL PACS deste tenant',
-    `pacs_api_token`        VARCHAR(500)   NULL COMMENT 'Token de acesso ao VOXEL PACS',
+    `pacs_api_url`          VARCHAR(500)   NULL,
+    `pacs_api_token`        VARCHAR(500)   NULL,
     `configuracoes_json`    TEXT           NULL,
     `created_at`            TIMESTAMP      DEFAULT CURRENT_TIMESTAMP,
     `updated_at`            TIMESTAMP      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -53,7 +59,7 @@ CREATE TABLE IF NOT EXISTS `cop_tenants` (
 -- ============================================================
 -- USUÁRIOS (Superadmin + Médicos)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS `cop_users` (
+CREATE TABLE `cop_users` (
     `id`                    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `name`                  VARCHAR(255)   NOT NULL,
     `email`                 VARCHAR(255)   NOT NULL,
@@ -62,7 +68,7 @@ CREATE TABLE IF NOT EXISTS `cop_users` (
     `status`                VARCHAR(20)    NOT NULL DEFAULT 'pendente',
     `crm`                   VARCHAR(30)    NULL,
     `crm_uf`                CHAR(2)        NULL,
-    `especialidades`        TEXT           NULL COMMENT 'JSON array de especialidades',
+    `especialidades`        TEXT           NULL,
     `telefone`              VARCHAR(20)    NULL,
     `cep`                   VARCHAR(9)     NULL,
     `logradouro`            VARCHAR(255)   NULL,
@@ -74,8 +80,13 @@ CREATE TABLE IF NOT EXISTS `cop_users` (
     `avatar_url`            VARCHAR(500)   NULL,
     `ultimo_login`          DATETIME       NULL,
     `email_verificado`      TINYINT(1)     NOT NULL DEFAULT 0,
-    `token_senha`           VARCHAR(100)   NULL COMMENT 'Token temporário para primeiro acesso',
+    `token_senha`           VARCHAR(100)   NULL,
     `token_expira_em`       DATETIME       NULL,
+    `ia_modelo`             VARCHAR(50)    NULL DEFAULT 'gpt-4o',
+    `ia_temperatura`        DECIMAL(3,2)   NULL DEFAULT 0.30,
+    `ia_estilo`             VARCHAR(30)    NULL DEFAULT 'formal',
+    `ia_vocabulario`        TEXT           NULL,
+    `assinatura_img`        TEXT           NULL,
     `created_at`            TIMESTAMP      DEFAULT CURRENT_TIMESTAMP,
     `updated_at`            TIMESTAMP      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY `uq_email` (`email`),
@@ -87,7 +98,7 @@ CREATE TABLE IF NOT EXISTS `cop_users` (
 -- ============================================================
 -- VÍNCULO USUÁRIO ↔ TENANT
 -- ============================================================
-CREATE TABLE IF NOT EXISTS `cop_user_tenants` (
+CREATE TABLE `cop_user_tenants` (
     `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `user_id`    INT UNSIGNED NOT NULL,
     `tenant_id`  INT UNSIGNED NOT NULL,
@@ -104,14 +115,14 @@ CREATE TABLE IF NOT EXISTS `cop_user_tenants` (
 -- ============================================================
 -- PERFIL DO MÉDICO (Medical Profile — memória de estilo)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS `cop_medico_perfil` (
+CREATE TABLE `cop_medico_perfil` (
     `id`                    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `user_id`               INT UNSIGNED NOT NULL,
     `tenant_id`             INT UNSIGNED NOT NULL,
-    `vocabulario_json`      TEXT         NULL COMMENT 'Substituições aprendidas: {"fígado":"parênquima hepático"}',
-    `frases_favoritas_json` TEXT         NULL COMMENT 'Frases frequentemente usadas',
-    `estilo_conclusao`      VARCHAR(20)  NULL DEFAULT 'normal' COMMENT 'curta|normal|detalhada',
-    `preferencias_json`     TEXT         NULL COMMENT 'Outras preferências do médico',
+    `vocabulario_json`      TEXT         NULL,
+    `frases_favoritas_json` TEXT         NULL,
+    `estilo_conclusao`      VARCHAR(20)  NULL DEFAULT 'normal',
+    `preferencias_json`     TEXT         NULL,
     `total_laudos`          INT UNSIGNED NOT NULL DEFAULT 0,
     `total_correcoes`       INT UNSIGNED NOT NULL DEFAULT 0,
     `updated_at`            TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -125,15 +136,15 @@ CREATE TABLE IF NOT EXISTS `cop_medico_perfil` (
 -- ============================================================
 -- TEMPLATES DE LAUDO (Máscaras)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS `cop_templates` (
+CREATE TABLE `cop_templates` (
     `id`            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `tenant_id`     INT UNSIGNED NOT NULL,
-    `user_id`       INT UNSIGNED NULL COMMENT 'NULL = template da clínica',
+    `user_id`       INT UNSIGNED NULL,
     `nome`          VARCHAR(255) NOT NULL,
-    `modalidade`    VARCHAR(20)  NULL COMMENT 'TC, RM, RX, US, MG, PET...',
+    `modalidade`    VARCHAR(20)  NULL,
     `especialidade` VARCHAR(100) NULL,
-    `corpo`         LONGTEXT     NOT NULL COMMENT 'Conteúdo HTML/texto do template',
-    `variaveis_json`TEXT         NULL COMMENT 'Variáveis dinâmicas do template',
+    `corpo`         LONGTEXT     NOT NULL,
+    `variaveis_json`TEXT         NULL,
     `ativo`         TINYINT(1)   NOT NULL DEFAULT 1,
     `uso_count`     INT UNSIGNED NOT NULL DEFAULT 0,
     `created_at`    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -147,15 +158,15 @@ CREATE TABLE IF NOT EXISTS `cop_templates` (
 -- ============================================================
 -- WORKSPACES (Sessão de laudo)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS `cop_workspaces` (
+CREATE TABLE `cop_workspaces` (
     `id`            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `tenant_id`     INT UNSIGNED NOT NULL,
     `medico_id`     INT UNSIGNED NOT NULL,
-    `study_uid`     VARCHAR(255) NOT NULL COMMENT 'StudyInstanceUID do PACS',
+    `study_uid`     VARCHAR(255) NOT NULL,
     `patient_uid`   VARCHAR(255) NULL,
     `patient_nome`  VARCHAR(255) NULL,
     `modalidade`    VARCHAR(20)  NULL,
-    `status`        VARCHAR(20)  NOT NULL DEFAULT 'aberto' COMMENT 'aberto|rascunho|assinado|cancelado',
+    `status`        VARCHAR(20)  NOT NULL DEFAULT 'aberto',
     `assumido_em`   DATETIME     NULL,
     `assinado_em`   DATETIME     NULL,
     `created_at`    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -171,7 +182,7 @@ CREATE TABLE IF NOT EXISTS `cop_workspaces` (
 -- ============================================================
 -- LAUDOS (Versões)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS `cop_laudos` (
+CREATE TABLE `cop_laudos` (
     `id`                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `workspace_id`      INT UNSIGNED NOT NULL,
     `tenant_id`         INT UNSIGNED NOT NULL,
@@ -183,10 +194,10 @@ CREATE TABLE IF NOT EXISTS `cop_laudos` (
     `impressao`         TEXT         NULL,
     `recomendacao`      TEXT         NULL,
     `cid`               VARCHAR(20)  NULL,
-    `status`            VARCHAR(20)  NOT NULL DEFAULT 'rascunho' COMMENT 'rascunho|assinado',
-    `ia_sugestao`       LONGTEXT     NULL COMMENT 'Sugestão original da IA',
-    `ia_modelo`         VARCHAR(50)  NULL COMMENT 'Modelo de IA utilizado',
-    `ia_tokens`         INT          NULL COMMENT 'Tokens consumidos',
+    `status`            VARCHAR(20)  NOT NULL DEFAULT 'rascunho',
+    `ia_sugestao`       LONGTEXT     NULL,
+    `ia_modelo`         VARCHAR(50)  NULL,
+    `ia_tokens`         INT          NULL,
     `assinado_em`       DATETIME     NULL,
     `created_at`        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     `updated_at`        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -202,12 +213,12 @@ CREATE TABLE IF NOT EXISTS `cop_laudos` (
 -- ============================================================
 -- CONVERSAS COM A IA (Histórico de chat)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS `cop_ia_conversas` (
+CREATE TABLE `cop_ia_conversas` (
     `id`            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `workspace_id`  INT UNSIGNED NOT NULL,
     `tenant_id`     INT UNSIGNED NOT NULL,
     `medico_id`     INT UNSIGNED NOT NULL,
-    `role`          VARCHAR(20)  NOT NULL COMMENT 'user|assistant|system',
+    `role`          VARCHAR(20)  NOT NULL,
     `conteudo`      LONGTEXT     NOT NULL,
     `modelo`        VARCHAR(50)  NULL,
     `tokens`        INT          NULL,
@@ -220,11 +231,11 @@ CREATE TABLE IF NOT EXISTS `cop_ia_conversas` (
 -- ============================================================
 -- AUTOTEXTOS (Frases rápidas)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS `cop_autotextos` (
+CREATE TABLE `cop_autotextos` (
     `id`            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `tenant_id`     INT UNSIGNED NOT NULL,
-    `user_id`       INT UNSIGNED NULL COMMENT 'NULL = global da clínica',
-    `atalho`        VARCHAR(50)  NOT NULL COMMENT 'Ex: /normal',
+    `user_id`       INT UNSIGNED NULL,
+    `atalho`        VARCHAR(50)  NOT NULL,
     `texto`         TEXT         NOT NULL,
     `modalidade`    VARCHAR(20)  NULL,
     `ativo`         TINYINT(1)   NOT NULL DEFAULT 1,
@@ -237,7 +248,7 @@ CREATE TABLE IF NOT EXISTS `cop_autotextos` (
 -- ============================================================
 -- AUDIT LOGS
 -- ============================================================
-CREATE TABLE IF NOT EXISTS `cop_audit_logs` (
+CREATE TABLE `cop_audit_logs` (
     `id`         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `tenant_id`  INT UNSIGNED NULL,
     `user_id`    INT UNSIGNED NULL,
