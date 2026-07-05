@@ -51,15 +51,15 @@ Router::get('/platform/planos',      'Platform\PlatformController@planos');
 Router::get('/platform/impersonar/{id}', 'Platform\PlatformController@impersonate');
 Router::get('/platform/sair-impersonacao', 'Platform\PlatformController@exitImpersonate');
 
-// ─── API COPILOT (AJAX) ─────────────────────────────────────────────────────
+// ─── API COPILOT (AJAX) ──────────────────────────────────────────────────────
 Router::post('/api/copilot/chat',     'CopilotApiController@chat');
 Router::post('/api/copilot/sugestao', 'CopilotApiController@sugestao');
 
 // ─── REDIRECT RAIZ ────────────────────────────────────────────────────────────
 Router::get('/', function() {
-    use App\Core\Auth;
-    if (Auth::check()) {
-        header('Location: ' . (Auth::isPlatformAdmin() ? '/platform/dashboard' : '/dashboard'));
+    if (\App\Core\Auth::check()) {
+        $dest = \App\Core\Auth::isPlatformAdmin() ? '/platform/dashboard' : '/dashboard';
+        header('Location: ' . $dest);
     } else {
         header('Location: /login');
     }
