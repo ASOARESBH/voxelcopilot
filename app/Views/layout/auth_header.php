@@ -7,9 +7,9 @@
     <meta name="description" content="VOXEL Copilot — Inteligência que acelera o diagnóstico por imagem">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="/assets/css/auth.css?v=<?= defined('ASSET_VERSION') ? ASSET_VERSION : '2.0.0' ?>">
+    <link rel="stylesheet" href="/assets/css/auth.css?v=<?= defined('ASSET_VERSION') ? ASSET_VERSION : '2.1.0' ?>">
 </head>
 <body class="<?= $bodyClass ?? '' ?>">
 
@@ -29,10 +29,8 @@
     ═══════════════════════════════════════════════════════ -->
     <aside class="auth-brand" aria-label="Informações do produto">
 
-        <!-- Fundo abstrato: grade de voxels + curvas DICOM -->
+        <!-- Fundo abstrato -->
         <div class="brand-bg" aria-hidden="true">
-
-            <!-- Grade de voxels (SVG gerado inline) -->
             <svg class="voxel-grid" viewBox="0 0 340 340" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <?php
                 $sz = 18; $gap = 4; $cols = 14; $rows = 14;
@@ -40,45 +38,36 @@
                     for ($c = 0; $c < $cols; $c++) {
                         $x  = $c * ($sz + $gap);
                         $y  = $r * ($sz + $gap);
-                        $op = round(0.15 + ($r + $c) / ($rows + $cols) * 0.55, 2);
+                        $op = round(0.12 + ($r + $c) / ($rows + $cols) * 0.45, 2);
                         echo "<rect x=\"{$x}\" y=\"{$y}\" width=\"{$sz}\" height=\"{$sz}\" rx=\"3\" fill=\"white\" fill-opacity=\"{$op}\"/>\n";
                     }
                 }
                 ?>
             </svg>
-
-            <!-- Curvas inspiradas em ondas DICOM / reconstrução 3D -->
             <svg class="dicom-curves" viewBox="0 0 440 220" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M0 110 Q35 30 70 110 Q105 190 140 110 Q175 30 210 110 Q245 190 280 110 Q315 30 350 110 Q385 190 420 110" stroke="white" stroke-width="1.5" fill="none"/>
                 <path d="M0 130 Q45 50 90 130 Q135 210 180 130 Q225 50 270 130 Q315 210 360 130 Q405 50 440 130" stroke="white" stroke-width="1" fill="none" opacity=".5"/>
                 <path d="M0 90 Q55 20 110 90 Q165 160 220 90 Q275 20 330 90 Q385 160 440 90" stroke="white" stroke-width=".7" fill="none" opacity=".3"/>
-                <!-- Partículas circulares -->
                 <circle cx="70"  cy="110" r="3" fill="white" opacity=".4"/>
                 <circle cx="140" cy="110" r="2" fill="white" opacity=".3"/>
                 <circle cx="210" cy="110" r="3" fill="white" opacity=".4"/>
                 <circle cx="280" cy="110" r="2" fill="white" opacity=".3"/>
                 <circle cx="350" cy="110" r="3" fill="white" opacity=".4"/>
             </svg>
-
-            <!-- Orbe de luz superior -->
             <div class="brand-orb brand-orb-1"></div>
             <div class="brand-orb brand-orb-2"></div>
         </div>
 
-        <!-- Logo oficial -->
+        <!-- ── LOGO no lado esquerdo (acima do headline) ── -->
         <div class="brand-logo">
-            <img src="/assets/img/logo.png" alt="VOXEL Copilot" width="220" height="auto">
+            <img
+                src="/assets/img/logo.png"
+                alt="VOXEL Copilot — Inteligência que acelera o diagnóstico por imagem"
+                class="brand-logo-img"
+            >
         </div>
 
-        <!-- Headline -->
-        <div class="brand-headline">
-            <h1>Inteligência que acelera o diagnóstico por imagem</h1>
-            <p>Plataforma enterprise de laudos assistidos por IA, integrada ao ecossistema VOXEL PACS.</p>
-        </div>
-
-        <div class="brand-divider" aria-hidden="true"></div>
-
-        <!-- Quatro benefícios -->
+        <!-- Benefícios -->
         <div class="brand-benefits" role="list">
             <?php
             $benefits = [
@@ -101,7 +90,7 @@
             <?php endforeach; ?>
         </div>
 
-        <!-- Cards de compliance no rodapé -->
+        <!-- Cards de compliance -->
         <div class="brand-footer" role="complementary" aria-label="Certificações de segurança">
             <div class="compliance-card">
                 <div class="compliance-card-title">

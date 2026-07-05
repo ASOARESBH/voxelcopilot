@@ -1,10 +1,19 @@
-<?php /* VOXEL Copilot — Login Enterprise */ ?>
+<?php /* VOXEL Copilot — Login Enterprise v2.1 */ ?>
 
 <!-- Card de login -->
 <div class="login-card" role="region" aria-label="Formulário de acesso">
 
     <!-- Linha decorativa topo -->
     <div class="card-accent-line" aria-hidden="true"></div>
+
+    <!-- ── LOGO no card (acima do título) ── -->
+    <div class="card-logo">
+        <img
+            src="/assets/img/logo.png"
+            alt="VOXEL Copilot"
+            class="card-logo-img"
+        >
+    </div>
 
     <!-- Cabeçalho -->
     <div class="card-header">
@@ -87,7 +96,7 @@
                 <i class="fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i>
                 Entrar
             </span>
-            <span class="btn-spinner" aria-hidden="true" aria-live="polite">
+            <span class="btn-spinner" aria-hidden="true">
                 <i class="fa-solid fa-spinner fa-spin"></i>
                 Autenticando...
             </span>
@@ -150,18 +159,14 @@ document.getElementById('form-login').addEventListener('submit', function(e) {
     var email = document.getElementById('email').value.trim();
     var pwd   = document.getElementById('password').value;
     if (!email || !pwd) { e.preventDefault(); return; }
-
     var btn = document.getElementById('btn-login');
     btn.classList.add('loading');
     btn.disabled = true;
     btn.setAttribute('aria-busy', 'true');
 });
-
 // Limpa estado de erro ao digitar
 ['email','password'].forEach(function(id) {
     var el = document.getElementById(id);
-    if (el) el.addEventListener('input', function() {
-        this.classList.remove('is-invalid');
-    });
+    if (el) el.addEventListener('input', function() { this.classList.remove('is-invalid'); });
 });
 </script>
