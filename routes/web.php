@@ -104,10 +104,19 @@ Router::get('/platform/sair-impersonacao', 'Platform\PlatformController@exitImpe
 
 // ─── AI ROUTER ───────────────────────────────────────────────────────────────
 Router::get('/ai-router',                        'AiRouterController@dashboard');
-Router::get('/ai-router/providers',              'AiRouterController@providers');
-Router::post('/ai-router/providers/salvar',      'AiRouterController@salvarProvider');
-Router::post('/ai-router/providers/excluir',     'AiRouterController@excluirProvider');
-Router::post('/ai-router/providers/testar',      'AiRouterController@testarProvider');
+
+// Providers — Wizard de 5 etapas (substitui a view antiga)
+Router::get('/ai-router/providers',              'ProviderWizardController@index');
+Router::post('/ai-router/providers/salvar',      'ProviderWizardController@salvar');
+Router::post('/ai-router/providers/excluir',     'ProviderWizardController@excluir');
+Router::get('/ai-router/providers/wizard',       'ProviderWizardController@index');
+
+// API REST do Wizard (AJAX)
+Router::post('/api/ai/provider/test',            'ProviderWizardController@apiTest');
+Router::post('/api/ai/provider/discover-models', 'ProviderWizardController@apiDiscoverModels');
+Router::post('/api/ai/provider/validate',        'ProviderWizardController@apiValidate');
+Router::get('/api/ai/provider/models',           'ProviderWizardController@apiModels');
+Router::get('/api/ai/provider/capabilities',     'ProviderWizardController@apiCapabilities');
 Router::get('/ai-router/modelos',                'AiRouterController@modelos');
 Router::post('/ai-router/modelos/salvar',        'AiRouterController@salvarModelo');
 Router::get('/ai-router/prompt-base',            'AiRouterController@promptBase');
