@@ -387,26 +387,29 @@ function starsHtml($rating) {
       </div>
 
       <!-- ════════════════════════════════════════════════════════
-           ETAPA 5 — Validação
+           ETAPA 5 — Validação e Diagnóstico Completo
            ════════════════════════════════════════════════════════ -->
       <div class="wizard-step-panel" id="panel5">
         <div class="validation-panel" style="margin:0 auto">
 
+          <!-- Cabeçalho de status -->
           <div class="validation-header">
             <div class="validation-icon-big" id="valIconBig">🔌</div>
             <div class="validation-title" id="valTitle">Pronto para Validar</div>
             <div class="validation-sub" id="valSub">Clique em "Validar Provider" para executar os 9 testes de verificação</div>
           </div>
 
+          <!-- Barra de progresso -->
           <div class="validation-progress" id="valProgressWrap" style="display:none">
             <div class="validation-progress-fill" id="valProgressFill" style="width:0%"></div>
           </div>
 
+          <!-- Lista de 9 testes -->
           <ul class="validation-steps-list" id="valStepsList">
             <?php
             $valSteps = [
                 1 => 'Autenticação',
-                2 => 'Geração de texto',
+                2 => 'Diagnóstico da API',
                 3 => 'Tempo de resposta',
                 4 => 'Capacidades',
                 5 => 'Contexto máximo',
@@ -426,9 +429,98 @@ function starsHtml($rating) {
             <?php endforeach; ?>
           </ul>
 
-          <div id="valResult" style="display:none"></div>
+          <!-- ── Painel de Diagnóstico Detalhado (aparece após validação) ── -->
+          <div id="diagPanel" style="display:none">
 
-          <div style="text-align:center;margin-top:8px">
+            <!-- Alerta de erro categorizado -->
+            <div id="diagErrorAlert" style="display:none" class="diag-error-alert">
+              <div class="diag-error-header">
+                <span class="diag-error-icon" id="diagErrorIcon">⚠</span>
+                <div>
+                  <div class="diag-error-title" id="diagErrorTitle">Erro</div>
+                  <div class="diag-error-cat" id="diagErrorCat"></div>
+                </div>
+              </div>
+              <div class="diag-error-msg" id="diagErrorMsg"></div>
+              <div class="diag-orientacao" id="diagOrientacao" style="display:none">
+                <div class="diag-orientacao-label">💡 Como resolver</div>
+                <div class="diag-orientacao-text" id="diagOrientacaoText"></div>
+              </div>
+            </div>
+
+            <!-- Seção: Detalhes da Requisição -->
+            <div class="diag-section">
+              <div class="diag-section-title">🔍 Detalhes da Requisição</div>
+              <div class="diag-grid">
+                <div class="diag-row">
+                  <span class="diag-label">Endpoint utilizado</span>
+                  <span class="diag-value diag-mono" id="diagEndpoint">—</span>
+                </div>
+                <div class="diag-row">
+                  <span class="diag-label">Modelo enviado</span>
+                  <span class="diag-value diag-mono" id="diagModelo">—</span>
+                </div>
+                <div class="diag-row">
+                  <span class="diag-label">HTTP Status</span>
+                  <span class="diag-value" id="diagHttpStatus">—</span>
+                </div>
+                <div class="diag-row">
+                  <span class="diag-label">Tempo da requisição</span>
+                  <span class="diag-value" id="diagTempo">—</span>
+                </div>
+                <div class="diag-row">
+                  <span class="diag-label">Tamanho do prompt</span>
+                  <span class="diag-value" id="diagPromptChars">—</span>
+                </div>
+                <div class="diag-row">
+                  <span class="diag-label">Tokens solicitados</span>
+                  <span class="diag-value" id="diagTokensSolic">—</span>
+                </div>
+                <div class="diag-row" id="diagTokensUsadosRow" style="display:none">
+                  <span class="diag-label">Tokens utilizados</span>
+                  <span class="diag-value" id="diagTokensUsados">—</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Seção: Payload enviado -->
+            <div class="diag-section">
+              <div class="diag-section-title">📤 Payload Enviado <span class="diag-badge-masked">API Key mascarada</span></div>
+              <pre class="diag-code" id="diagPayload">—</pre>
+            </div>
+
+            <!-- Seção: Resposta do Provider -->
+            <div class="diag-section">
+              <div class="diag-section-title" id="diagRespTitle">📥 Resposta do Provider</div>
+              <pre class="diag-code" id="diagRespostaRaw">—</pre>
+            </div>
+
+            <!-- Seção: Campos de erro estruturados (só aparece em erro) -->
+            <div class="diag-section" id="diagErroCamposSection" style="display:none">
+              <div class="diag-section-title">🔎 Campos de Erro Estruturados</div>
+              <div class="diag-grid">
+                <div class="diag-row" id="diagErroTipoRow" style="display:none">
+                  <span class="diag-label">type</span>
+                  <span class="diag-value diag-mono diag-err" id="diagErroTipo">—</span>
+                </div>
+                <div class="diag-row" id="diagErroCodeRow" style="display:none">
+                  <span class="diag-label">code</span>
+                  <span class="diag-value diag-mono diag-err" id="diagErroCode">—</span>
+                </div>
+                <div class="diag-row" id="diagErroParamRow" style="display:none">
+                  <span class="diag-label">param</span>
+                  <span class="diag-value diag-mono diag-err" id="diagErroParam">—</span>
+                </div>
+                <div class="diag-row" id="diagErroMsgRow" style="display:none">
+                  <span class="diag-label">message</span>
+                  <span class="diag-value diag-err" id="diagErroMsgFull">—</span>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /#diagPanel -->
+
+          <div style="text-align:center;margin-top:16px">
             <button class="btn btn-primary btn-lg" id="btnValidate" onclick="runValidation()">
               🔬 VALIDAR PROVIDER
             </button>
@@ -876,11 +968,15 @@ function selectMode(btn) {
   btn.classList.add('active');
 }
 
-// ─── Etapa 5: Validação ───────────────────────────────────────
+// ─── Etapa 5: Validação e Diagnóstico Completo ───────────────
 async function runValidation() {
   const btn = document.getElementById('btnValidate');
   btn.disabled = true;
-  btn.textContent = '⟳ Validando...';
+  btn.innerHTML = '⟳ Validando...';
+
+  // Ocultar painel de diagnóstico anterior
+  document.getElementById('diagPanel').style.display = 'none';
+  document.getElementById('diagErrorAlert').style.display = 'none';
 
   document.getElementById('valProgressWrap').style.display = 'block';
   document.getElementById('valProgressFill').style.width = '0%';
@@ -900,14 +996,14 @@ async function runValidation() {
   try {
     const payload = {
       provider_type: WIZ.selectedType,
-      api_key:       WIZ.credData.api_key       || '',
-      endpoint:      WIZ.credData.endpoint      || '',
-      deployment:    WIZ.credData.deployment    || '',
-      api_version:   WIZ.credData.api_version   || '',
-      model_id:      WIZ.selectedModel          || '',
+      api_key:       WIZ.credData.api_key     || '',
+      endpoint:      WIZ.credData.endpoint    || '',
+      deployment:    WIZ.credData.deployment  || '',
+      api_version:   WIZ.credData.api_version || '',
+      model_id:      WIZ.selectedModel        || '',
     };
 
-    // Animar steps enquanto aguarda
+    // Animar steps enquanto aguarda resposta
     let animStep = 1;
     const animInterval = setInterval(() => {
       if (animStep <= 9) {
@@ -919,55 +1015,175 @@ async function runValidation() {
       }
     }, 400);
 
-    const res = await fetch('/api/ai/provider/validate', {
+    const res  = await fetch('/api/ai/provider/validate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     const data = await res.json();
-
     clearInterval(animInterval);
 
-    // Preencher resultados reais
+    // ── Preencher resultados nos steps ──
     if (data.steps && data.steps.length > 0) {
       data.steps.forEach((s, i) => {
-        const n = s.num || (i + 1);
+        const n    = s.num || (i + 1);
         const item = document.getElementById('valStep' + n);
         if (!item) return;
         item.className = 'validation-step-item ' + (s.ok ? 'ok' : 'error');
         document.getElementById('valStepDetail' + n).textContent = s.detalhe || '';
-        document.getElementById('valStepIcon' + n).textContent = s.ok ? '✓' : '✗';
-        document.getElementById('valProgressFill').style.width = ((n / 9) * 100) + '%';
+        document.getElementById('valStepIcon' + n).textContent   = s.ok ? '✓' : '✗';
+        document.getElementById('valProgressFill').style.width   = ((n / 9) * 100) + '%';
       });
     } else {
-      // Fallback: marcar todos como ok
       for (let i = 1; i <= 9; i++) {
         document.getElementById('valStep' + i).className = 'validation-step-item ok';
         document.getElementById('valStepDetail' + i).textContent = 'Verificado';
-        document.getElementById('valStepIcon' + i).textContent = '✓';
+        document.getElementById('valStepIcon' + i).textContent   = '✓';
       }
       document.getElementById('valProgressFill').style.width = '100%';
     }
 
-    const allOk = data.ok !== false;
+    // ── Cabeçalho de resultado ──
+    const allOk   = data.ok !== false;
     const bigIcon = document.getElementById('valIconBig');
-    bigIcon.className = 'validation-icon-big ' + (allOk ? 'ok' : 'error');
+    bigIcon.className   = 'validation-icon-big ' + (allOk ? 'ok' : 'error');
     bigIcon.textContent = allOk ? '✓' : '✗';
-    document.getElementById('valTitle').textContent = allOk ? 'Provider Validado com Sucesso!' : 'Validação com Erros';
+    document.getElementById('valTitle').textContent = allOk
+      ? 'Provider Validado com Sucesso!'
+      : 'Validação com Erros — Veja o diagnóstico abaixo';
     document.getElementById('valSub').textContent = allOk
       ? 'Todos os testes passaram. Clique em "Salvar Provider" para finalizar.'
-      : 'Alguns testes falharam. Revise as configurações e tente novamente.';
-
+      : 'Alguns testes falharam. Analise o diagnóstico detalhado e corrija as configurações.';
     document.getElementById('valProgressFill').style.width = '100%';
 
+    // ── Popular painel de diagnóstico ──
+    const diag = data.diagnostico || {};
+    renderDiagnostico(diag, data, allOk);
+
   } catch (e) {
-    document.getElementById('valTitle').textContent = 'Erro na Validação';
-    document.getElementById('valSub').textContent = e.message;
-    document.getElementById('valIconBig').className = 'validation-icon-big error';
+    document.getElementById('valTitle').textContent   = 'Erro na Validação';
+    document.getElementById('valSub').textContent     = e.message;
+    document.getElementById('valIconBig').className   = 'validation-icon-big error';
     document.getElementById('valIconBig').textContent = '✗';
   } finally {
     btn.disabled = false;
     btn.innerHTML = '🔬 VALIDAR PROVIDER';
+  }
+}
+
+/** Popula o painel de diagnóstico detalhado com os dados retornados pelo backend */
+function renderDiagnostico(diag, data, allOk) {
+  const panel = document.getElementById('diagPanel');
+  panel.style.display = 'block';
+
+  // ── Detalhes da requisição ──
+  setText('diagEndpoint',    diag.endpoint_usado     || '—');
+  setText('diagModelo',      diag.modelo_enviado     || '—');
+  setText('diagTempo',       data.tempo_ia_ms != null ? data.tempo_ia_ms + ' ms' : '—');
+  setText('diagPromptChars', diag.prompt_chars != null ? diag.prompt_chars + ' caracteres' : '—');
+  setText('diagTokensSolic', diag.tokens_solicitados != null ? diag.tokens_solicitados + ' tokens' : '—');
+
+  // HTTP Status com cor
+  const httpEl = document.getElementById('diagHttpStatus');
+  const code   = diag.http_status;
+  if (code) {
+    httpEl.textContent = code;
+    httpEl.className   = 'diag-value diag-http-' + (code >= 200 && code < 300 ? 'ok' : code >= 400 && code < 500 ? 'warn' : 'err');
+  } else {
+    httpEl.textContent = '—';
+    httpEl.className   = 'diag-value';
+  }
+
+  // Tokens utilizados (só em sucesso)
+  if (diag.tokens_usados != null) {
+    document.getElementById('diagTokensUsadosRow').style.display = '';
+    setText('diagTokensUsados', diag.tokens_usados + ' tokens');
+  } else {
+    document.getElementById('diagTokensUsadosRow').style.display = 'none';
+  }
+
+  // ── Payload (com API Key mascarada) ──
+  if (diag.payload && Object.keys(diag.payload).length > 0) {
+    document.getElementById('diagPayload').textContent = JSON.stringify(diag.payload, null, 2);
+  } else {
+    document.getElementById('diagPayload').textContent = '—';
+  }
+
+  // ── Resposta bruta do provider ──
+  const respTitle = document.getElementById('diagRespTitle');
+  const respEl    = document.getElementById('diagRespostaRaw');
+  if (allOk) {
+    respTitle.textContent = '📥 Resposta do Provider (sucesso)';
+    respEl.className      = 'diag-code diag-code-ok';
+  } else {
+    respTitle.textContent = '📥 Resposta do Provider (erro)';
+    respEl.className      = 'diag-code diag-code-err';
+  }
+  if (diag.resposta_raw) {
+    try {
+      const parsed = JSON.parse(diag.resposta_raw);
+      respEl.textContent = JSON.stringify(parsed, null, 2);
+    } catch (e) {
+      respEl.textContent = diag.resposta_raw;
+    }
+  } else {
+    respEl.textContent = '—';
+  }
+
+  // ── Alerta de erro categorizado ──
+  if (!allOk && diag.erro_categoria && diag.erro_categoria !== 'ok') {
+    const alertEl = document.getElementById('diagErrorAlert');
+    alertEl.style.display = 'block';
+    alertEl.className     = 'diag-error-alert diag-cat-' + diag.erro_categoria;
+
+    const catLabels = {
+      'rate_limit':        { icon: '⚠️', title: 'Rate Limit Excedido',                    cat: 'HTTP 429 — Limite de requisições por minuto atingido' },
+      'quota_insuficiente':{ icon: '🚫', title: 'Créditos Insuficientes (insufficient_quota)', cat: 'HTTP 429 — Saldo insuficiente na conta do provider' },
+      'auth_invalida':     { icon: '🔑', title: 'API Key Inválida ou Revogada',            cat: 'HTTP 401 — Falha de autenticação' },
+      'modelo_invalido':   { icon: '🤖', title: 'Modelo Não Encontrado',                   cat: 'HTTP 404 — O modelo informado não existe ou não está disponível' },
+      'endpoint_invalido': { icon: '🔌', title: 'Endpoint Inacessível',                    cat: 'Falha de conexão com o servidor' },
+      'timeout':           { icon: '⏱️', title: 'Timeout na Requisição',                  cat: 'O servidor não respondeu dentro do tempo limite' },
+      'outro':             { icon: '✗',  title: 'Erro Inesperado',                         cat: 'Verifique a mensagem de erro abaixo' },
+    };
+    const info = catLabels[diag.erro_categoria] || catLabels['outro'];
+    setText('diagErrorIcon',  info.icon);
+    setText('diagErrorTitle', info.title);
+    setText('diagErrorCat',   info.cat);
+    setText('diagErrorMsg',   diag.erro_mensagem || '—');
+
+    if (diag.orientacao) {
+      document.getElementById('diagOrientacao').style.display = 'block';
+      setText('diagOrientacaoText', diag.orientacao);
+    } else {
+      document.getElementById('diagOrientacao').style.display = 'none';
+    }
+
+    // Campos estruturados
+    const hasCampos = diag.erro_tipo || diag.erro_code || diag.erro_param || diag.erro_mensagem;
+    document.getElementById('diagErroCamposSection').style.display = hasCampos ? 'block' : 'none';
+    showDiagField('diagErroTipoRow',  'diagErroTipo',    diag.erro_tipo);
+    showDiagField('diagErroCodeRow',  'diagErroCode',    diag.erro_code);
+    showDiagField('diagErroParamRow', 'diagErroParam',   diag.erro_param);
+    showDiagField('diagErroMsgRow',   'diagErroMsgFull', diag.erro_mensagem);
+  } else {
+    document.getElementById('diagErrorAlert').style.display       = 'none';
+    document.getElementById('diagErroCamposSection').style.display = 'none';
+  }
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function showDiagField(rowId, valId, val) {
+  const row = document.getElementById(rowId);
+  const el  = document.getElementById(valId);
+  if (val) {
+    row.style.display = '';
+    el.textContent    = val;
+  } else {
+    row.style.display = 'none';
   }
 }
 

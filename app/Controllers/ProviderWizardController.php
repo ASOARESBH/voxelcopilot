@@ -420,79 +420,463 @@ class ProviderWizardController extends Controller
 
     private function runFullValidation(string $type, string $apiKey, string $endpoint, string $modelId, string $deployment, string $apiVersion): array
     {
-        $result     = ['ok'=>false,'steps'=>[],'latencia_ms'=>null,'tempo_total_ms'=>null,'tempo_ia_ms'=>null,'context_max'=>null,'saldo'=>null,'saldo_disp'=>false,'caps'=>[]];
+        $result = [
+            'ok'            => false,
+            'steps'         => [],
+            'latencia_ms'   => null,
+            'tempo_total_ms'=> null,
+            'tempo_ia_ms'   => null,
+            'context_max'   => null,
+            'saldo'         => null,
+            'saldo_disp'    => false,
+            'caps'          => [],
+            'diagnostico'   => null,   // detalhes completos da requisição de geração
+        ];
         $totalStart = microtime(true);
 
-        $authResult = $this->testConnection($type,$apiKey,$endpoint,$deployment,$apiVersion);
-        $result['steps'][] = ['num'=>1,'nome'=>'Autenticacao','ok'=>$authResult['ok'],'detalhe'=>$authResult['ok']?'API Key valida':($authResult['error']??'Falha')];
-        if (!$authResult['ok']) { $result['steps'][] = ['num'=>2,'nome'=>'Geracao de texto','ok'=>false,'detalhe'=>'Pulado']; return $result; }
-        $result['latencia_ms'] = $authResult['latencia_ms']??null;
+        // ── Passo 1: Autenticação ─────────────────────────────────
+        $authResult = $this->testConnection($type, $apiKey, $endpoint, $deployment, $apiVersion);
+        $authOk     = $authResult['ok'];
+        $result['steps'][] = [
+            'num'    => 1,
+            'nome'   => 'Autenticação',
+            'ok'     => $authOk,
+            'detalhe'=> $authOk
+                ? 'API Key válida — conta: ' . ($authResult['conta'] ?? '—') . ' | latência: ' . ($authResult['latencia_ms'] ?? '—') . 'ms'
+                : $this->formatAuthError($authResult),
+        ];
+        $result['latencia_ms'] = $authResult['latencia_ms'] ?? null;
 
+        if (!$authOk) {
+            $result['steps'][] = ['num'=>2,'nome'=>'Diagnóstico da API','ok'=>false,'detalhe'=>'Pulado — autenticação falhou'];
+            $result['steps'][] = ['num'=>3,'nome'=>'Tempo de resposta','ok'=>false,'detalhe'=>'Pulado'];
+            $this->saveTestRecord(null, $type, $modelId, $endpoint, $apiKey, $deployment, $apiVersion, false, false, $authResult['latencia_ms']??null, null, null, null, null, null, $authResult, null, null, null);
+            return $result;
+        }
+
+        // ── Passo 2: Diagnóstico completo da API ──────────────────
         $genStart  = microtime(true);
-        $genResult = $this->testGeneration($type,$apiKey,$endpoint,$modelId,$deployment,$apiVersion);
-        $genTime   = round((microtime(true)-$genStart)*1000);
-        $result['steps'][] = ['num'=>2,'nome'=>'Geracao de texto','ok'=>$genResult['ok'],'detalhe'=>$genResult['ok']?('Resposta: "'.($genResult['response']??'').'"'):($genResult['error']??'Falha')];
+        $genResult = $this->testGenerationDetailed($type, $apiKey, $endpoint, $modelId, $deployment, $apiVersion);
+        $genTime   = round((microtime(true) - $genStart) * 1000);
+        $genOk     = $genResult['ok'];
         $result['tempo_ia_ms'] = $genTime;
+        $result['diagnostico'] = $genResult['diagnostico'] ?? null;
 
-        $result['steps'][] = ['num'=>3,'nome'=>'Tempo de resposta','ok'=>true,'detalhe'=>"Latencia: {$result['latencia_ms']}ms | IA: {$genTime}ms"];
+        $step2Detalhe = $genOk
+            ? 'Resposta: "' . ($genResult['response'] ?? '') . '" — ' . ($genResult['tokens_usados'] ?? '?') . ' tokens'
+            : $this->formatGenError($genResult);
 
-        $caps = $this->detectCapabilities($type,$modelId);
+        $result['steps'][] = [
+            'num'    => 2,
+            'nome'   => 'Diagnóstico da API',
+            'ok'     => $genOk,
+            'detalhe'=> $step2Detalhe,
+            'error_detail' => $genOk ? null : ($genResult['diagnostico'] ?? null),
+        ];
+
+        // ── Passo 3: Tempo de resposta ────────────────────────────
+        $result['steps'][] = [
+            'num'    => 3,
+            'nome'   => 'Tempo de resposta',
+            'ok'     => true,
+            'detalhe'=> 'Auth: ' . ($result['latencia_ms'] ?? '—') . 'ms | Geração: ' . $genTime . 'ms',
+        ];
+
+        // ── Passo 4: Capacidades ──────────────────────────────────
+        $caps = $this->detectCapabilities($type, $modelId);
         $result['caps']    = $caps;
-        $result['steps'][] = ['num'=>4,'nome'=>'Capacidades','ok'=>true,'detalhe'=>implode(', ',array_keys(array_filter($caps)))];
+        $result['steps'][] = [
+            'num'    => 4,
+            'nome'   => 'Capacidades',
+            'ok'     => true,
+            'detalhe'=> implode(', ', array_keys(array_filter($caps))),
+        ];
 
+        // ── Passo 5: Contexto máximo ──────────────────────────────
         $ctx = $this->contextWindowForModel($modelId);
         $result['context_max'] = $ctx;
-        $result['steps'][] = ['num'=>5,'nome'=>'Contexto maximo','ok'=>true,'detalhe'=>$ctx?number_format($ctx).' tokens':'Nao identificado'];
+        $result['steps'][] = [
+            'num'    => 5,
+            'nome'   => 'Contexto máximo',
+            'ok'     => true,
+            'detalhe'=> $ctx ? number_format($ctx, 0, ',', '.') . ' tokens' : 'Não identificado',
+        ];
 
-        $result['steps'][] = ['num'=>6,'nome'=>'Endpoint','ok'=>true,'detalhe'=>$authResult['endpoint']??$endpoint];
-        $result['steps'][] = ['num'=>7,'nome'=>'Versao da API','ok'=>true,'detalhe'=>$authResult['api_version']??'v1'];
-        $result['steps'][] = ['num'=>8,'nome'=>'Saldo','ok'=>true,'detalhe'=>'Saldo indisponivel para este Provider'];
+        // ── Passo 6: Endpoint ─────────────────────────────────────
+        $epUsado = $genResult['diagnostico']['endpoint_usado'] ?? $authResult['endpoint'] ?? $endpoint;
+        $result['steps'][] = ['num'=>6,'nome'=>'Endpoint','ok'=>true,'detalhe'=> $epUsado];
 
-        $result['tempo_total_ms'] = round((microtime(true)-$totalStart)*1000);
-        $result['steps'][] = ['num'=>9,'nome'=>'Benchmark salvo','ok'=>true,'detalhe'=>"Total: {$result['tempo_total_ms']}ms"];
+        // ── Passo 7: Versão da API ────────────────────────────────
+        $result['steps'][] = ['num'=>7,'nome'=>'Versão da API','ok'=>true,'detalhe'=> $authResult['api_version'] ?? 'v1'];
 
-        $result['ok'] = $genResult['ok'];
+        // ── Passo 8: Saldo ────────────────────────────────────────
+        $result['steps'][] = ['num'=>8,'nome'=>'Saldo','ok'=>true,'detalhe'=>'Consulta de saldo não disponível para este provider'];
+
+        // ── Passo 9: Benchmark / persistência ────────────────────
+        $result['tempo_total_ms'] = round((microtime(true) - $totalStart) * 1000);
+        $testId = $this->saveTestRecord(
+            null, $type, $modelId,
+            $epUsado, $apiKey, $deployment, $apiVersion,
+            $authOk, $genOk,
+            $result['latencia_ms'], $result['tempo_total_ms'], $genTime,
+            $ctx, null,
+            $genResult['diagnostico'] ?? null,
+            $authResult,
+            $genResult['response'] ?? null,
+            $genResult['tokens_usados'] ?? null,
+            $caps
+        );
+        $result['steps'][] = [
+            'num'    => 9,
+            'nome'   => 'Benchmark salvo',
+            'ok'     => true,
+            'detalhe'=> 'Total: ' . $result['tempo_total_ms'] . 'ms | Registro #' . ($testId ?: '—'),
+        ];
+
+        $result['ok'] = $genOk;
         return $result;
     }
 
-    private function testGeneration(string $type, string $apiKey, string $endpoint, string $modelId, string $deployment, string $apiVersion): array
+    /**
+     * Diagnóstico completo da API: monta payload, executa chamada de geração,
+     * captura resposta bruta, extrai campos de erro estruturados e gera orientação.
+     */
+    private function testGenerationDetailed(string $type, string $apiKey, string $endpoint, string $modelId, string $deployment, string $apiVersion): array
     {
+        $promptText     = 'Responda apenas: OK';
+        $maxTokens      = 10;
+        $promptChars    = strlen($promptText);
+        $epUsado        = '';
+        $payloadArr     = [];
+        $payloadMasked  = [];
+
         try {
-            $payload = json_encode(['model'=>$modelId,'messages'=>[['role'=>'user','content'=>'Responda apenas: OK']],'max_tokens'=>10]);
             switch ($type) {
                 case 'openai': case 'openrouter': case 'deepseek': case 'mistral': case 'qwen': case 'custom': case 'lmstudio':
-                    $ep  = rtrim($endpoint?:$this->getDefaultEndpoint($type),'/');
-                    $res = $this->httpPost("$ep/chat/completions",$payload,['Authorization: Bearer '.$apiKey,'Content-Type: application/json']);
+                    $epUsado    = rtrim($endpoint ?: $this->getDefaultEndpoint($type), '/') . '/chat/completions';
+                    $payloadArr = ['model'=>$modelId,'messages'=>[['role'=>'user','content'=>$promptText]],'max_tokens'=>$maxTokens];
+                    $payloadMasked = $payloadArr;
+                    $res = $this->httpPost($epUsado, json_encode($payloadArr), ['Authorization: Bearer '.$this->maskApiKey($apiKey).' [MASKED]', 'Content-Type: application/json']);
+                    // Chamada real com key real
+                    $res = $this->httpPost($epUsado, json_encode($payloadArr), ['Authorization: Bearer '.$apiKey, 'Content-Type: application/json']);
                     break;
+
                 case 'anthropic':
-                    $ep   = rtrim($endpoint?:'https://api.anthropic.com','/');
-                    $body = json_encode(['model'=>$modelId,'max_tokens'=>10,'messages'=>[['role'=>'user','content'=>'Responda apenas: OK']]]);
-                    $res  = $this->httpPost("$ep/v1/messages",$body,['x-api-key: '.$apiKey,'anthropic-version: 2023-06-01','Content-Type: application/json']);
+                    $epUsado    = rtrim($endpoint ?: 'https://api.anthropic.com', '/') . '/v1/messages';
+                    $payloadArr = ['model'=>$modelId,'max_tokens'=>$maxTokens,'messages'=>[['role'=>'user','content'=>$promptText]]];
+                    $payloadMasked = $payloadArr;
+                    $res = $this->httpPost($epUsado, json_encode($payloadArr), ['x-api-key: '.$apiKey,'anthropic-version: 2023-06-01','Content-Type: application/json']);
                     break;
+
                 case 'google':
-                    $ep   = rtrim($endpoint?:'https://generativelanguage.googleapis.com/v1beta','/');
-                    $body = json_encode(['contents'=>[['parts'=>[['text'=>'Responda apenas: OK']]]]]);
-                    $res  = $this->httpPost("$ep/models/$modelId:generateContent?key=$apiKey",$body,['Content-Type: application/json']);
+                    $epUsado    = rtrim($endpoint ?: 'https://generativelanguage.googleapis.com/v1beta', '/') . '/models/' . $modelId . ':generateContent?key=[MASKED]';
+                    $epReal     = rtrim($endpoint ?: 'https://generativelanguage.googleapis.com/v1beta', '/') . '/models/' . $modelId . ':generateContent?key=' . $apiKey;
+                    $payloadArr = ['contents'=>[['parts'=>[['text'=>$promptText]]]]];
+                    $payloadMasked = $payloadArr;
+                    $res = $this->httpPost($epReal, json_encode($payloadArr), ['Content-Type: application/json']);
                     break;
+
                 case 'azure':
-                    $ep  = rtrim($endpoint,'/');
-                    $ver = $apiVersion?:'2024-02-01';
-                    $res = $this->httpPost("$ep/openai/deployments/$deployment/chat/completions?api-version=$ver",$payload,['api-key: '.$apiKey,'Content-Type: application/json']);
+                    $ver        = $apiVersion ?: '2024-02-01';
+                    $epUsado    = rtrim($endpoint, '/') . '/openai/deployments/' . $deployment . '/chat/completions?api-version=' . $ver;
+                    $payloadArr = ['model'=>$modelId,'messages'=>[['role'=>'user','content'=>$promptText]],'max_tokens'=>$maxTokens];
+                    $payloadMasked = $payloadArr;
+                    $res = $this->httpPost($epUsado, json_encode($payloadArr), ['api-key: '.$apiKey,'Content-Type: application/json']);
                     break;
+
                 case 'ollama':
-                    $ep   = rtrim($endpoint?:'http://localhost:11434','/');
-                    $body = json_encode(['model'=>$modelId,'messages'=>[['role'=>'user','content'=>'Responda apenas: OK']],'stream'=>false]);
-                    $res  = $this->httpPost("$ep/api/chat",$body,['Content-Type: application/json']);
+                    $epUsado    = rtrim($endpoint ?: 'http://localhost:11434', '/') . '/api/chat';
+                    $payloadArr = ['model'=>$modelId,'messages'=>[['role'=>'user','content'=>$promptText]],'stream'=>false];
+                    $payloadMasked = $payloadArr;
+                    $res = $this->httpPost($epUsado, json_encode($payloadArr), ['Content-Type: application/json']);
                     break;
-                default: return ['ok'=>false,'error'=>'Provider nao suportado'];
+
+                default:
+                    return [
+                        'ok'          => false,
+                        'error'       => 'Provider não suportado: ' . $type,
+                        'diagnostico' => ['endpoint_usado'=>$epUsado,'modelo_enviado'=>$modelId,'payload'=>[],'resposta_raw'=>null,'http_status'=>null,'erro_tipo'=>null,'erro_code'=>null,'erro_param'=>null,'erro_mensagem'=>'Provider não suportado','erro_categoria'=>'outro','orientacao'=>'Verifique o tipo de provider configurado.','tokens_solicitados'=>$maxTokens,'prompt_chars'=>$promptChars],
+                    ];
             }
+
+            $httpCode    = $res['code'];
+            $respostaRaw = $res['body'];
+            $bodyArr     = json_decode($respostaRaw, true) ?? [];
+
+            // ── Extrair campos de erro estruturados ───────────────
+            $erroTipo      = null;
+            $erroCode      = null;
+            $erroParam     = null;
+            $erroMensagem  = null;
+            $erroCategoria = 'ok';
+            $orientacao    = null;
+            $respostaTexto = null;
+            $tokensUsados  = null;
+
             if ($res['ok']) {
-                $b    = json_decode($res['body'],true)??[];
-                $text = $b['choices'][0]['message']['content']??$b['content'][0]['text']??$b['candidates'][0]['content']['parts'][0]['text']??$b['message']['content']??'OK';
-                return ['ok'=>true,'response'=>trim(substr($text,0,20))];
+                // Sucesso — extrair texto e tokens
+                $respostaTexto = trim(
+                    $bodyArr['choices'][0]['message']['content']
+                    ?? $bodyArr['content'][0]['text']
+                    ?? $bodyArr['candidates'][0]['content']['parts'][0]['text']
+                    ?? $bodyArr['message']['content']
+                    ?? 'OK'
+                );
+                $tokensUsados = $bodyArr['usage']['total_tokens']
+                    ?? $bodyArr['usage']['input_tokens'] + ($bodyArr['usage']['output_tokens'] ?? 0)
+                    ?? $bodyArr['usage']['prompt_tokens'] + ($bodyArr['usage']['completion_tokens'] ?? 0)
+                    ?? null;
+            } else {
+                // Erro — extrair campos estruturados por provider
+                $errObj = $bodyArr['error'] ?? $bodyArr;
+
+                // OpenAI / Azure / OpenRouter / DeepSeek / Mistral / Qwen / Custom
+                $erroMensagem = $errObj['message'] ?? $errObj['error_description'] ?? $errObj['detail'] ?? null;
+                $erroTipo     = $errObj['type']    ?? $errObj['error'] ?? null;
+                $erroCode     = $errObj['code']    ?? null;
+                $erroParam    = $errObj['param']   ?? null;
+
+                // Anthropic: { error: { type, message } }
+                if (isset($bodyArr['error']['type'])) {
+                    $erroTipo     = $bodyArr['error']['type'];
+                    $erroMensagem = $bodyArr['error']['message'] ?? $erroMensagem;
+                }
+
+                // Google: { error: { code, message, status } }
+                if (isset($bodyArr['error']['status'])) {
+                    $erroTipo     = $bodyArr['error']['status'];
+                    $erroCode     = (string)($bodyArr['error']['code'] ?? $httpCode);
+                    $erroMensagem = $bodyArr['error']['message'] ?? $erroMensagem;
+                }
+
+                // Fallback: se não extraiu nada, usar o body bruto truncado
+                if (!$erroMensagem) {
+                    $erroMensagem = substr($respostaRaw, 0, 500);
+                }
+
+                // ── Categorizar o erro ────────────────────────────
+                $erroCategoria = $this->categorizarErro($httpCode, $erroTipo, $erroCode, $erroMensagem);
+                $orientacao    = $this->gerarOrientacao($erroCategoria, $type, $erroMensagem);
             }
-            return ['ok'=>false,'error'=>'HTTP '.$res['code']];
-        } catch (\Exception $e) { return ['ok'=>false,'error'=>$e->getMessage()]; }
+
+            $diagnostico = [
+                'endpoint_usado'    => $epUsado,
+                'modelo_enviado'    => $modelId,
+                'payload'           => $payloadMasked,
+                'resposta_raw'      => $respostaRaw,
+                'http_status'       => $httpCode,
+                'tokens_solicitados'=> $maxTokens,
+                'prompt_chars'      => $promptChars,
+                'erro_tipo'         => $erroTipo,
+                'erro_code'         => $erroCode,
+                'erro_param'        => $erroParam,
+                'erro_mensagem'     => $erroMensagem,
+                'erro_categoria'    => $erroCategoria,
+                'orientacao'        => $orientacao,
+                'resposta_texto'    => $respostaTexto,
+                'tokens_usados'     => $tokensUsados,
+            ];
+
+            return [
+                'ok'           => $res['ok'],
+                'response'     => $respostaTexto ? substr($respostaTexto, 0, 60) : null,
+                'tokens_usados'=> $tokensUsados,
+                'diagnostico'  => $diagnostico,
+            ];
+
+        } catch (\Exception $e) {
+            $diagnostico = [
+                'endpoint_usado'    => $epUsado,
+                'modelo_enviado'    => $modelId,
+                'payload'           => $payloadMasked,
+                'resposta_raw'      => null,
+                'http_status'       => null,
+                'tokens_solicitados'=> $maxTokens,
+                'prompt_chars'      => $promptChars,
+                'erro_tipo'         => 'exception',
+                'erro_code'         => null,
+                'erro_param'        => null,
+                'erro_mensagem'     => $e->getMessage(),
+                'erro_categoria'    => 'outro',
+                'orientacao'        => 'Verifique a conectividade com o endpoint e se o servidor está acessível.',
+                'resposta_texto'    => null,
+                'tokens_usados'     => null,
+            ];
+            return ['ok'=>false,'error'=>$e->getMessage(),'diagnostico'=>$diagnostico];
+        }
+    }
+
+    /** Categoriza o erro HTTP + campos do provider em uma categoria semântica */
+    private function categorizarErro(int $httpCode, ?string $tipo, ?string $code, ?string $mensagem): string
+    {
+        $m = strtolower($mensagem ?? '');
+        $c = strtolower($code ?? '');
+        $t = strtolower($tipo ?? '');
+
+        if ($httpCode === 401 || $t === 'invalid_api_key' || $t === 'authentication_error' || strpos($m,'invalid api key')!==false || strpos($m,'unauthorized')!==false) {
+            return 'auth_invalida';
+        }
+        if ($httpCode === 429) {
+            // Diferenciar rate limit de quota insuficiente
+            if ($c === 'insufficient_quota' || strpos($m,'insufficient_quota')!==false || strpos($m,'exceeded your current quota')!==false || strpos($m,'billing')!==false || strpos($m,'credit')!==false || strpos($m,'no credits')!==false || strpos($m,'out of credits')!==false) {
+                return 'quota_insuficiente';
+            }
+            return 'rate_limit';
+        }
+        if ($httpCode === 404 || strpos($m,'model not found')!==false || strpos($m,'does not exist')!==false || $c === 'model_not_found') {
+            return 'modelo_invalido';
+        }
+        if ($httpCode === 0 || strpos($m,'timed out')!==false || strpos($m,'timeout')!==false || strpos($m,'connection refused')!==false || strpos($m,'could not connect')!==false) {
+            return strpos($m,'timeout')!==false ? 'timeout' : 'endpoint_invalido';
+        }
+        if ($httpCode >= 400 && $httpCode < 500) return 'outro';
+        if ($httpCode >= 500) return 'outro';
+        return 'ok';
+    }
+
+    /** Gera orientação textual para o usuário com base na categoria do erro */
+    private function gerarOrientacao(string $categoria, string $type, ?string $mensagem): string
+    {
+        switch ($categoria) {
+            case 'auth_invalida':
+                return 'A API Key informada é inválida ou foi revogada. Acesse o painel do provider, gere uma nova chave e atualize as credenciais no Wizard.';
+
+            case 'rate_limit':
+                return 'Limite de requisições por minuto (RPM) atingido. Aguarde alguns segundos e tente novamente. Se o problema persistir, verifique o plano contratado ou distribua as chamadas em um intervalo maior.';
+
+            case 'quota_insuficiente':
+                return 'Créditos insuficientes (insufficient_quota). Sua conta não possui saldo disponível para realizar chamadas. Acesse o painel de faturamento do provider e adicione créditos ou configure um método de pagamento.';
+
+            case 'modelo_invalido':
+                return 'O modelo "' . $mensagem . '" não foi encontrado ou não está disponível para sua conta. Retorne à Etapa 3 e selecione um modelo diferente, ou verifique se o modelo está ativo no painel do provider.';
+
+            case 'endpoint_invalido':
+                return 'Não foi possível conectar ao endpoint informado. Verifique se a URL está correta, se o serviço está online e se não há bloqueio de firewall ou proxy.';
+
+            case 'timeout':
+                return 'A requisição excedeu o tempo limite. O provider pode estar com alta latência. Tente aumentar o Timeout nas configurações (Etapa 4) ou tente novamente em alguns instantes.';
+
+            default:
+                return 'Erro inesperado retornado pelo provider. Verifique a mensagem de erro acima e consulte a documentação oficial do provider para mais detalhes.';
+        }
+    }
+
+    /** Formata a mensagem de erro de autenticação para exibição */
+    private function formatAuthError(array $authResult): string
+    {
+        $err = $authResult['error'] ?? 'Falha na autenticação';
+        $code = $authResult['code'] ?? null;
+        return $code ? "HTTP {$code} — {$err}" : $err;
+    }
+
+    /** Formata a mensagem de erro de geração para exibição no step */
+    private function formatGenError(array $genResult): string
+    {
+        $diag = $genResult['diagnostico'] ?? [];
+        $cat  = $diag['erro_categoria'] ?? 'outro';
+        $http = $diag['http_status'] ?? null;
+        $msg  = $diag['erro_mensagem'] ?? ($genResult['error'] ?? 'Falha');
+
+        $catLabel = [
+            'rate_limit'        => '⚠ Rate Limit Excedido',
+            'quota_insuficiente'=> '🚫 Créditos Insuficientes (insufficient_quota)',
+            'auth_invalida'     => '🔑 API Key Inválida',
+            'modelo_invalido'   => '🤖 Modelo Não Encontrado',
+            'endpoint_invalido' => '🔌 Endpoint Inacessível',
+            'timeout'           => '⏱ Timeout',
+            'outro'             => '✗ Erro',
+        ][$cat] ?? '✗ Erro';
+
+        $prefix = $http ? "HTTP {$http} — {$catLabel}" : $catLabel;
+        return $prefix . ': ' . substr($msg, 0, 120);
+    }
+
+    /** Persiste o resultado do teste na tabela cop_ai_provider_tests */
+    private function saveTestRecord(
+        ?int    $providerId,
+        string  $type,
+        string  $modelId,
+        string  $endpoint,
+        string  $apiKey,
+        string  $deployment,
+        string  $apiVersion,
+        bool    $authOk,
+        bool    $genOk,
+        ?int    $latenciaMs,
+        ?int    $tempoTotalMs,
+        ?int    $tempoIaMs,
+        ?int    $contextMax,
+        ?float  $saldoUsd,
+        ?array  $diagnostico,
+        ?array  $authResult,
+        ?string $respostaTexto,
+        ?int    $tokensUsados,
+        ?array  $caps
+    ): ?int {
+        try {
+            $status = $genOk ? 'ok' : ($authOk ? 'parcial' : 'erro');
+
+            // Payload mascarado para auditoria
+            $payloadJson = null;
+            if (!empty($diagnostico['payload'])) {
+                $payloadJson = json_encode($diagnostico['payload'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+
+            $stmt = $this->db->prepare(
+                "INSERT INTO cop_ai_provider_tests
+                    (provider_id, user_id, model_id, endpoint_usado, modelo_enviado,
+                     payload_json, resposta_raw, tokens_solicitados, prompt_chars,
+                     http_status, erro_tipo, erro_code, erro_param, erro_mensagem,
+                     erro_categoria, orientacao, resposta_texto, tokens_usados,
+                     auth_ok, gen_ok, latencia_ms, tempo_total_ms, tempo_ia_ms,
+                     cap_chat, cap_vision, cap_streaming, cap_json, cap_functions,
+                     cap_structured, cap_long_ctx, context_max, saldo_usd,
+                     saldo_disponivel, status, erro_msg)
+                 VALUES
+                    (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+            );
+            $stmt->execute([
+                $providerId,
+                $this->userId,
+                $modelId ?: null,
+                $endpoint ?: null,
+                $modelId ?: null,
+                $payloadJson,
+                $diagnostico['resposta_raw'] ?? null,
+                $diagnostico['tokens_solicitados'] ?? null,
+                $diagnostico['prompt_chars'] ?? null,
+                $diagnostico['http_status'] ?? null,
+                $diagnostico['erro_tipo'] ?? null,
+                $diagnostico['erro_code'] ?? null,
+                $diagnostico['erro_param'] ?? null,
+                $diagnostico['erro_mensagem'] ?? null,
+                $diagnostico['erro_categoria'] ?? ($genOk ? 'ok' : 'outro'),
+                $diagnostico['orientacao'] ?? null,
+                $respostaTexto,
+                $tokensUsados,
+                $authOk ? 1 : 0,
+                $genOk  ? 1 : 0,
+                $latenciaMs,
+                $tempoTotalMs,
+                $tempoIaMs,
+                $caps['Chat']              ?? 0,
+                $caps['Vision']            ?? 0,
+                $caps['Streaming']         ?? 0,
+                $caps['JSON Mode']         ?? 0,
+                $caps['Function Calling']  ?? 0,
+                $caps['Structured Output'] ?? 0,
+                $caps['Long Context']      ?? 0,
+                $contextMax,
+                $saldoUsd,
+                0,
+                $status,
+                $diagnostico['erro_mensagem'] ?? null,
+            ]);
+            return (int)$this->db->lastInsertId();
+        } catch (\Exception $e) {
+            // Silencioso — não bloquear o fluxo de validação
+            return null;
+        }
     }
 
     private function detectCapabilities(string $type, string $modelId): array

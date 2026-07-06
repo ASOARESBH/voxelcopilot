@@ -1215,3 +1215,238 @@
 @media (max-width: 380px) {
   .provider-grid { grid-template-columns: 1fr; }
 }
+
+/* ─── Painel de Diagnóstico Detalhado ──────────────────────── */
+
+/* Seção genérica */
+.diag-section {
+  background: var(--wiz-white);
+  border: 1px solid var(--wiz-gray-border);
+  border-radius: var(--wiz-radius-sm);
+  padding: 16px 20px;
+  margin-top: 16px;
+}
+
+.diag-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--wiz-blue-deep);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.diag-badge-masked {
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--wiz-yellow-pale);
+  color: var(--wiz-yellow);
+  border: 1px solid #fde68a;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-left: 8px;
+}
+
+/* Grade de metadados */
+.diag-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diag-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--wiz-gray-border);
+}
+
+.diag-row:last-child {
+  border-bottom: none;
+}
+
+.diag-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wiz-gray-text);
+  min-width: 160px;
+  flex-shrink: 0;
+}
+
+.diag-value {
+  font-size: 12px;
+  color: var(--wiz-gray-dark);
+  word-break: break-all;
+}
+
+.diag-mono {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  background: var(--wiz-gray-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--wiz-gray-border);
+}
+
+.diag-err {
+  color: var(--wiz-red);
+  font-weight: 600;
+}
+
+/* HTTP Status colorido */
+.diag-http-ok {
+  color: var(--wiz-green);
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.diag-http-warn {
+  color: var(--wiz-yellow);
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.diag-http-err {
+  color: var(--wiz-red);
+  font-weight: 700;
+  font-family: monospace;
+}
+
+/* Blocos de código (payload / resposta) */
+.diag-code {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  background: #0d1117;
+  color: #c9d1d9;
+  border-radius: var(--wiz-radius-xs);
+  padding: 14px 16px;
+  overflow-x: auto;
+  white-space: pre;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  border: 1px solid #30363d;
+}
+
+.diag-code-ok {
+  border-left: 3px solid var(--wiz-green);
+}
+
+.diag-code-err {
+  border-left: 3px solid var(--wiz-red);
+}
+
+/* ─── Alerta de Erro Categorizado ───────────────────────────── */
+.diag-error-alert {
+  border-radius: var(--wiz-radius-sm);
+  padding: 16px 20px;
+  margin-top: 16px;
+  border: 1px solid;
+}
+
+/* Cores por categoria */
+.diag-cat-rate_limit {
+  background: var(--wiz-yellow-pale);
+  border-color: #fde68a;
+}
+
+.diag-cat-quota_insuficiente {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.diag-cat-auth_invalida {
+  background: var(--wiz-red-pale);
+  border-color: #fecaca;
+}
+
+.diag-cat-modelo_invalido {
+  background: var(--wiz-blue-pale);
+  border-color: var(--wiz-blue-border);
+}
+
+.diag-cat-endpoint_invalido,
+.diag-cat-timeout {
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+}
+
+.diag-cat-outro {
+  background: var(--wiz-red-pale);
+  border-color: #fecaca;
+}
+
+.diag-error-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.diag-error-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.diag-error-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--wiz-gray-dark);
+  margin-bottom: 2px;
+}
+
+.diag-error-cat {
+  font-size: 11px;
+  color: var(--wiz-gray-text);
+  font-weight: 600;
+}
+
+.diag-error-msg {
+  font-size: 13px;
+  color: var(--wiz-gray-dark);
+  background: rgba(255,255,255,0.6);
+  border-radius: var(--wiz-radius-xs);
+  padding: 10px 14px;
+  margin-top: 8px;
+  font-family: 'Courier New', Courier, monospace;
+  word-break: break-word;
+  line-height: 1.5;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+/* Orientação "Como resolver" */
+.diag-orientacao {
+  margin-top: 12px;
+  background: rgba(255,255,255,0.7);
+  border-radius: var(--wiz-radius-xs);
+  padding: 12px 14px;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.diag-orientacao-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--wiz-blue-main);
+  margin-bottom: 6px;
+}
+
+.diag-orientacao-text {
+  font-size: 13px;
+  color: var(--wiz-gray-dark);
+  line-height: 1.6;
+}
+
+/* Responsividade do painel */
+@media (max-width: 600px) {
+  .diag-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .diag-label {
+    min-width: unset;
+  }
+}
