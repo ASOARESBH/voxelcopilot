@@ -21,6 +21,9 @@
       <a href="#notificacoes" class="config-nav-item" onclick="trocarAba('notificacoes',this)">
         <i class="fa-solid fa-bell"></i> Notificações
       </a>
+      <a href="#autorizacao" class="config-nav-item <?= (($_GET['tab'] ?? '') === 'autorizacao') ? 'active' : '' ?>" onclick="trocarAba('autorizacao',this)">
+        <i class="fa-solid fa-hospital-user"></i> Autorização
+      </a>
       <a href="#seguranca" class="config-nav-item" onclick="trocarAba('seguranca',this)">
         <i class="fa-solid fa-shield"></i> Segurança
       </a>
@@ -122,6 +125,13 @@
         </div>
       </div>
 
+      <!-- Aba: Autorização PACS -->
+      <?php
+        $autorizacoes = $autorizacoes ?? [];
+        $stats        = $stats        ?? ['total'=>0,'ativas'=>0,'pendentes'=>0,'laudos'=>0];
+        include __DIR__ . '/autorizacao.php';
+      ?>
+
       <!-- Aba: Segurança -->
       <div id="aba-seguranca" class="config-aba" style="display:none">
         <form method="POST" action="/configuracoes/senha">
@@ -166,12 +176,22 @@
 
 <script>
 function trocarAba(nome, el) {
-  event.preventDefault();
+  if (event) event.preventDefault();
   document.querySelectorAll('.config-aba').forEach(a => a.style.display = 'none');
   document.querySelectorAll('.config-nav-item').forEach(a => a.classList.remove('active'));
-  document.getElementById('aba-' + nome).style.display = 'block';
-  el.classList.add('active');
+  const aba = document.getElementById('aba-' + nome);
+  if (aba) aba.style.display = 'block';
+  if (el) el.classList.add('active');
 }
+
+// Abre a aba correta via ?tab=
+document.addEventListener('DOMContentLoaded', function() {
+  const tab = new URLSearchParams(window.location.search).get('tab');
+  if (tab) {
+    const link = document.querySelector('.config-nav-item[href="#' + tab + '"]');
+    if (link) trocarAba(tab, link);
+  }
+});
 
 // Canvas de Assinatura
 const canvas = document.getElementById('canvasAssinatura');

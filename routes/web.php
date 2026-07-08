@@ -84,6 +84,13 @@ Router::post('/configuracoes/perfil','ConfiguracoesController@salvarPerfil');
 Router::post('/configuracoes/ia',    'ConfiguracoesController@salvarIA');
 Router::post('/configuracoes/senha', 'ConfiguracoesController@alterarSenha');
 
+// ─── AUTORIZAÇÃO PACS ────────────────────────────────────────────────────────────────────────────────
+Router::get( '/configuracoes/autorizacao',           'AutorizacaoPacsController@index');
+Router::post('/configuracoes/autorizacao/cadastrar', 'AutorizacaoPacsController@cadastrar');
+Router::post('/configuracoes/autorizacao/revogar',   'AutorizacaoPacsController@revogar');
+Router::get( '/configuracoes/autorizacao/{id}',      'AutorizacaoPacsController@detalhe');
+Router::post('/api/pacs/validar-token',              'AutorizacaoPacsController@apiValidarToken');
+
 // ─── AUTOTEXTOS ───────────────────────────────────────────────────────────────
 Router::get('/autotextos',           'AutotextosController@index');
 Router::post('/autotextos',          'AutotextosController@criar');

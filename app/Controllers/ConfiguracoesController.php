@@ -15,11 +15,40 @@ class ConfiguracoesController extends Controller {
         $user   = Auth::user();
         $userId = Auth::userId();
 
+        // Carrega dados de autorização PACS para a aba embutida
+        $autorizacoes = [];
+        $stats        = ['total'=>0,'ativas'=>0,'pendentes'=>0,'laudos'=>0];
+        try {
+            $stmt = $pdo->prepare("
+                SELECT
+                    a.id, a.codigo_medico, a.token_integracao, a.status AS auth_status,
+                    a.modalidades_permitidas, a.total_laudos, a.ultimo_laudo, a.data_ativacao, a.created_at,
+                    u.id AS unidade_id, u.codigo_unidade, u.nome_instituicao, u.cnpj,
+                    u.cidade, u.estado, u.pacs_tipo, u.pacs_ae_title, u.status AS unidade_status
+                FROM cop_pacs_autorizacoes a
+                JOIN cop_pacs_unidades u ON u.id = a.unidade_id
+                WHERE a.medico_user_id = :uid
+                ORDER BY a.created_at DESC
+            ");
+            $stmt->execute(['uid' => $userId]);
+            $autorizacoes = $stmt->fetchAll(\PDO::FETCH_OBJ);
+            $stats['total']     = count($autorizacoes);
+            foreach ($autorizacoes as $a) {
+                if ($a->auth_status === 'ativo')    $stats['ativas']++;
+                if ($a->auth_status === 'pendente') $stats['pendentes']++;
+                $stats['laudos'] += (int)$a->total_laudos;
+            }
+        } catch (\Exception $e) {
+            // Tabelas ainda não existem — migration pendente
+        }
+
         $this->view('configuracoes/index', [
             'title'        => 'Configurações — VOXEL Copilot',
             'pageTitle'    => 'Configurações',
             'pageSubtitle' => 'Perfil, preferências e configurações de IA',
             'user'         => $user,
+            'autorizacoes' => $autorizacoes,
+            'stats'        => $stats,
         ]);
     }
 
