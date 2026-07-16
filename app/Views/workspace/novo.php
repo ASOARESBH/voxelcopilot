@@ -1,3 +1,19 @@
+<?php
+// Feedback de erros
+$erroMap = [
+    'study_uid_obrigatorio' => 'O campo Study UID é obrigatório para criar um laudo.',
+    'db_error'              => 'Erro ao salvar no banco de dados: ' . htmlspecialchars($_GET['msg'] ?? 'verifique os logs do servidor.'),
+];
+$erroMsg = isset($_GET['erro']) ? ($erroMap[$_GET['erro']] ?? 'Ocorreu um erro. Tente novamente.') : null;
+?>
+
+<?php if ($erroMsg): ?>
+<div class="alert alert-danger" data-dismiss="6000" style="margin-bottom:16px;">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <?= $erroMsg ?>
+</div>
+<?php endif; ?>
+
 <div class="page-header">
     <div class="page-header-left">
         <h1>Novo Laudo</h1>

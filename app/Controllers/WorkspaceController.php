@@ -82,17 +82,22 @@ class WorkspaceController extends Controller {
         TenantMiddleware::handle();
         $pdo      = Database::getInstance();
         $medicoId = Auth::userId();
-        $tenantId = Auth::tenantId();
+        $tenantId = Auth::tenantId() ?: null;
 
         // Templates disponíveis (por tenant ou por médico em modo standalone)
-        if ($tenantId) {
-            $tplStmt = $pdo->prepare("SELECT id, nome, modalidade, especialidade FROM cop_templates WHERE tenant_id = :tid AND ativo = 1 ORDER BY uso_count DESC, nome ASC");
-            $tplStmt->execute(['tid' => $tenantId]);
-        } else {
-            $tplStmt = $pdo->prepare("SELECT id, nome, modalidade, especialidade FROM cop_templates WHERE user_id = :uid AND ativo = 1 ORDER BY uso_count DESC, nome ASC");
-            $tplStmt->execute(['uid' => $medicoId]);
+        $templates = [];
+        try {
+            if ($tenantId) {
+                $tplStmt = $pdo->prepare("SELECT id, nome, modalidade, especialidade FROM cop_templates WHERE tenant_id = :tid AND ativo = 1 ORDER BY uso_count DESC, nome ASC");
+                $tplStmt->execute(['tid' => $tenantId]);
+            } else {
+                $tplStmt = $pdo->prepare("SELECT id, nome, modalidade, especialidade FROM cop_templates WHERE (user_id = :uid OR tenant_id IS NULL) AND ativo = 1 ORDER BY uso_count DESC, nome ASC");
+                $tplStmt->execute(['uid' => $medicoId]);
+            }
+            $templates = $tplStmt->fetchAll();
+        } catch (\PDOException $e) {
+            error_log('[WorkspaceController::novo] templates: ' . $e->getMessage());
         }
-        $templates = $tplStmt->fetchAll();
 
         // Config PACS
         $pacsConfig = null;
@@ -116,7 +121,7 @@ class WorkspaceController extends Controller {
         TenantMiddleware::handle();
         $pdo      = Database::getInstance();
         $medicoId = Auth::userId();
-        $tenantId = Auth::tenantId();
+        $tenantId = Auth::tenantId() ?: null; // NULL explícito para modo standalone
 
         $studyUid    = trim($_POST['study_uid']    ?? '');
         $patientNome = trim($_POST['patient_nome'] ?? '');
@@ -128,52 +133,63 @@ class WorkspaceController extends Controller {
             $this->redirect('/workspace/novo?erro=study_uid_obrigatorio');
         }
 
-        // Cria workspace
-        $pdo->prepare("
-            INSERT INTO cop_workspaces (tenant_id, medico_id, study_uid, patient_uid, patient_nome, modalidade, status, assumido_em, created_at, updated_at)
-            VALUES (:tid, :mid, :study_uid, :patient_uid, :patient_nome, :modalidade, 'aberto', NOW(), NOW(), NOW())
-        ")->execute([
-            'tid'          => $tenantId,
-            'mid'          => $medicoId,
-            'study_uid'    => $studyUid,
-            'patient_uid'  => $patientUid ?: null,
-            'patient_nome' => $patientNome ?: null,
-            'modalidade'   => $modalidade ?: null,
-        ]);
-        $workspaceId = (int) $pdo->lastInsertId();
+        try {
+            // Cria workspace
+            $pdo->prepare("
+                INSERT INTO cop_workspaces (tenant_id, medico_id, study_uid, patient_uid, patient_nome, modalidade, status, assumido_em, created_at, updated_at)
+                VALUES (:tid, :mid, :study_uid, :patient_uid, :patient_nome, :modalidade, 'aberto', NOW(), NOW(), NOW())
+            ")->execute([
+                'tid'          => $tenantId,
+                'mid'          => $medicoId,
+                'study_uid'    => $studyUid,
+                'patient_uid'  => $patientUid ?: null,
+                'patient_nome' => $patientNome ?: null,
+                'modalidade'   => $modalidade ?: null,
+            ]);
+            $workspaceId = (int) $pdo->lastInsertId();
 
-        // Carrega template se selecionado
-        $corpo = '';
-        if ($templateId) {
-            $tpl = $pdo->prepare("SELECT corpo FROM cop_templates WHERE id = :id LIMIT 1");
-            $tpl->execute(['id' => $templateId]);
-            $tpl = $tpl->fetch();
-            if ($tpl) {
-                $corpo = $tpl->corpo ?? '';
-                $pdo->prepare("UPDATE cop_templates SET uso_count = uso_count + 1 WHERE id = :id")->execute(['id' => $templateId]);
+            // Carrega template se selecionado
+            $corpo = '';
+            if ($templateId) {
+                $tpl = $pdo->prepare("SELECT corpo FROM cop_templates WHERE id = :id LIMIT 1");
+                $tpl->execute(['id' => $templateId]);
+                $tpl = $tpl->fetch();
+                if ($tpl) {
+                    $corpo = $tpl->corpo ?? '';
+                    $pdo->prepare("UPDATE cop_templates SET uso_count = uso_count + 1 WHERE id = :id")->execute(['id' => $templateId]);
+                }
             }
+
+            // Cria laudo em rascunho
+            $pdo->prepare("
+                INSERT INTO cop_laudos (workspace_id, tenant_id, medico_id, versao, achados, status, created_at, updated_at)
+                VALUES (:wid, :tid, :mid, 1, :achados, 'rascunho', NOW(), NOW())
+            ")->execute([
+                'wid'     => $workspaceId,
+                'tid'     => $tenantId,
+                'mid'     => $medicoId,
+                'achados' => $corpo,
+            ]);
+            $laudoId = (int) $pdo->lastInsertId();
+
+            $this->redirect("/workspace/{$laudoId}");
+
+        } catch (\PDOException $e) {
+            // Log detalhado para diagnóstico
+            error_log('[WorkspaceController::criar] PDOException: ' . $e->getMessage()
+                . ' | tenant_id=' . var_export($tenantId, true)
+                . ' | medico_id=' . $medicoId
+                . ' | study_uid=' . $studyUid
+            );
+            $this->redirect('/workspace/novo?erro=db_error&msg=' . urlencode($e->getMessage()));
         }
-
-        // Cria laudo em rascunho
-        $pdo->prepare("
-            INSERT INTO cop_laudos (workspace_id, tenant_id, medico_id, versao, achados, status, created_at, updated_at)
-            VALUES (:wid, :tid, :mid, 1, :achados, 'rascunho', NOW(), NOW())
-        ")->execute([
-            'wid'     => $workspaceId,
-            'tid'     => $tenantId,
-            'mid'     => $medicoId,
-            'achados' => $corpo,
-        ]);
-        $laudoId = (int) $pdo->lastInsertId();
-
-        $this->redirect("/workspace/{$laudoId}");
     }
 
     public function show(int $id): void {
         TenantMiddleware::handle();
         $pdo      = Database::getInstance();
         $medicoId = Auth::userId();
-        $tenantId = Auth::tenantId();
+        $tenantId = Auth::tenantId() ?: null;
 
         // Busca laudo — tolerante a tenant nulo (modo standalone)
         if ($tenantId) {
