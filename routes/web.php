@@ -63,6 +63,14 @@ Router::get('/templates/{id}/editar','TemplatesController@editar');
 Router::post('/templates/{id}/atualizar','TemplatesController@atualizar');
 Router::post('/templates/{id}/excluir','TemplatesController@excluir');
 
+// ─── MÁSCARAS DE LAUDO ───────────────────────────────────────────────────────
+Router::get('/templates/mascaras',                        'MascarasController@index');
+Router::get('/templates/mascaras/{id}/preview',           'MascarasController@preview');
+Router::post('/templates/mascaras/{id}/importar',         'MascarasController@importarDaBiblioteca');
+Router::post('/templates/mascaras/importar-docx',         'MascarasController@importarDocx');
+Router::post('/templates/mascaras/confirmar-importacao',  'MascarasController@confirmarImportacao');
+Router::post('/templates/mascaras/seed',                  'MascarasController@seed');
+
 // ─── PESQUISA CLÍNICA ─────────────────────────────────────────────────────────
 Router::get('/pesquisa',             'PesquisaController@index');
 Router::post('/pesquisa/buscar',     'PesquisaController@buscar');
@@ -160,6 +168,7 @@ Router::get('/api/pacs/buscar',           'PacsController@buscar');
 
 // ─── API TEMPLATES (AJAX) ───────────────────────────────────────────────────
 Router::get('/api/templates/{id}/corpo',  'TemplatesController@getCorpo');
+Router::get('/api/mascaras/buscar',        'MascarasController@buscar');
 
 // ─── API COPILOT (AJAX) ──────────────────────────────────────────────────────
 Router::post('/api/copilot/chat',         'CopilotApiController@chat');

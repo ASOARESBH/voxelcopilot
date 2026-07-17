@@ -28,6 +28,7 @@
         </select>
       </div>
       <button type="submit" class="btn btn-outline"><i class="fa-solid fa-filter"></i> Filtrar</button>
+      <a href="/templates/mascaras" class="btn btn-secondary"><i class="fa-solid fa-book-medical"></i> Biblioteca de Máscaras</a>
       <a href="/templates/novo" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Novo Template</a>
     </form>
   </div>
