@@ -10,11 +10,135 @@ class CopilotAIService {
     private string $apiKey;
     private string $model;
     private string $baseUrl;
+    private string $providerType = 'openai';
 
     public function __construct() {
-        $this->apiKey  = $_ENV['OPENAI_API_KEY'] ?? '';
-        $this->model   = $_ENV['OPENAI_MODEL']   ?? 'gpt-4o';
-        $this->baseUrl = $_ENV['OPENAI_API_BASE'] ?? 'https://api.openai.com/v1';
+        $this->apiKey  = '';
+        $this->model   = 'gpt-4o';
+        $this->baseUrl = 'https://api.openai.com/v1';
+        $this->resolveApiKey();
+    }
+
+    /**
+     * Resolve a chave de API na seguinte ordem de prioridade:
+     * 1. Provider padrão do AI Router (cop_ai_providers) do médico logado
+     * 2. Variável de ambiente OPENAI_API_KEY (fallback global)
+     */
+    private function resolveApiKey(): void {
+        try {
+            $userId = Auth::userId();
+            if ($userId) {
+                $pdo  = Database::getInstance();
+                // Busca provider padrão ativo do médico no AI Router
+                $stmt = $pdo->prepare("
+                    SELECT id, api_key_enc, provider_type, endpoint, temperatura, max_tokens
+                    FROM cop_ai_providers
+                    WHERE user_id = :uid
+                      AND wizard_completo = 1
+                    ORDER BY is_default DESC, updated_at DESC
+                    LIMIT 1
+                ");
+                $stmt->execute(['uid' => $userId]);
+                $provider = $stmt->fetch(\PDO::FETCH_OBJ);
+
+                if ($provider && !empty($provider->api_key_enc)) {
+                    $decrypted = $this->decrypt($provider->api_key_enc);
+                    if ($decrypted) {
+                        $this->apiKey       = $decrypted;
+                        $this->providerType = $provider->provider_type;
+                        $this->model        = $this->resolveDefaultModel($provider->provider_type);
+
+                        // Endpoint customizado para providers não-OpenAI
+                        if (!empty($provider->endpoint)) {
+                            $this->baseUrl = rtrim($provider->endpoint, '/');
+                        } else {
+                            $this->baseUrl = $this->resolveBaseUrl($provider->provider_type);
+                        }
+
+                        Logger::info('CopilotAI: usando provider do AI Router', [
+                            'provider_id'   => $provider->id,
+                            'provider_type' => $provider->provider_type,
+                            'user_id'       => $userId,
+                        ]);
+                        return;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Logger::error('CopilotAI resolveApiKey error', ['error' => $e->getMessage()]);
+        }
+
+        // Fallback: variável de ambiente
+        $this->apiKey       = $_ENV['OPENAI_API_KEY'] ?? '';
+        $this->model        = $_ENV['OPENAI_MODEL']   ?? 'gpt-4o';
+        $this->baseUrl      = $_ENV['OPENAI_API_BASE'] ?? 'https://api.openai.com/v1';
+        $this->providerType = 'openai';
+    }
+
+    private function resolveDefaultModel(string $type): string {
+        $map = [
+            'openai'     => 'gpt-4o',
+            'anthropic'  => 'claude-3-5-sonnet-20241022',
+            'google'     => 'gemini-1.5-pro',
+            'azure'      => 'gpt-4o',
+            'deepseek'   => 'deepseek-chat',
+            'mistral'    => 'mistral-large-latest',
+            'openrouter' => 'openai/gpt-4o',
+            'ollama'     => 'llama3.2',
+            'lmstudio'   => 'local-model',
+            'qwen'       => 'qwen-turbo',
+        ];
+        return $map[$type] ?? 'gpt-4o';
+    }
+
+    private function resolveBaseUrl(string $type): string {
+        $map = [
+            'openai'     => 'https://api.openai.com/v1',
+            'anthropic'  => 'https://api.anthropic.com/v1',
+            'google'     => 'https://generativelanguage.googleapis.com/v1beta/openai',
+            'deepseek'   => 'https://api.deepseek.com/v1',
+            'mistral'    => 'https://api.mistral.ai/v1',
+            'openrouter' => 'https://openrouter.ai/api/v1',
+            'ollama'     => 'http://localhost:11434/v1',
+            'lmstudio'   => 'http://localhost:1234/v1',
+        ];
+        return $map[$type] ?? 'https://api.openai.com/v1';
+    }
+
+    /**
+     * Descriptografa a API Key salva pelo ProviderWizardController (AES-256-CBC)
+     */
+    private function decrypt(string $encrypted): string {
+        try {
+            $key    = $_ENV['APP_KEY'] ?? 'voxel-copilot-key-2024';
+            $data   = base64_decode($encrypted);
+            if (strlen($data) <= 16) return '';
+            $iv     = substr($data, 0, 16);
+            $cipher = substr($data, 16);
+            $result = openssl_decrypt(
+                $cipher,
+                'AES-256-CBC',
+                hash('sha256', $key, true),
+                OPENSSL_RAW_DATA,
+                $iv
+            );
+            return $result !== false ? $result : '';
+        } catch (\Throwable $e) {
+            Logger::error('CopilotAI decrypt error', ['error' => $e->getMessage()]);
+            return '';
+        }
+    }
+
+    /**
+     * Retorna informações sobre o provider ativo (para exibir na UI)
+     */
+    public function getProviderInfo(): array {
+        return [
+            'type'    => $this->providerType,
+            'model'   => $this->model,
+            'baseUrl' => $this->baseUrl,
+            'hasKey'  => !empty($this->apiKey),
+        ];
     }
 
     /**
@@ -84,7 +208,7 @@ class CopilotAIService {
                 'tokens'  => $tokens,
             ]);
 
-            return ['ok' => true, 'content' => $content, 'tokens' => $tokens];
+            return ['ok' => true, 'content' => $content, 'tokens' => $tokens, 'model' => $this->model];
 
         } catch (\Throwable $e) {
             Logger::error('CopilotAI error', ['error' => $e->getMessage()]);
@@ -129,7 +253,7 @@ class CopilotAIService {
                 VALUES (:wid, :tid, :mid, 'assistant', :content, :model, :tokens, NOW())
             ")->execute(['wid'=>$workspaceId,'tid'=>$tenantId,'mid'=>$medicoId,'content'=>$content,'model'=>$this->model,'tokens'=>$tokens]);
 
-            return ['ok' => true, 'content' => $content, 'tokens' => $tokens];
+            return ['ok' => true, 'content' => $content, 'tokens' => $tokens, 'model' => $this->model];
 
         } catch (\Throwable $e) {
             Logger::error('CopilotAI chat error', ['error' => $e->getMessage()]);
@@ -147,9 +271,9 @@ class CopilotAIService {
         }
 
         $estiloMap = [
-            'curta'    => 'Seja conciso e objetivo. Conclusões curtas e diretas.',
-            'normal'   => 'Use linguagem médica padrão, clara e objetiva.',
-            'detalhada'=> 'Seja detalhado e descritivo, incluindo achados negativos relevantes.',
+            'curta'     => 'Seja conciso e objetivo. Conclusões curtas e diretas.',
+            'normal'    => 'Use linguagem médica padrão, clara e objetiva.',
+            'detalhada' => 'Seja detalhado e descritivo, incluindo achados negativos relevantes.',
         ];
         $estiloInstr = $estiloMap[$estilo] ?? $estiloMap['normal'];
 
@@ -181,7 +305,7 @@ PROMPT;
 
     private function callOpenAI(array $messages): array {
         if (empty($this->apiKey)) {
-            throw new \RuntimeException('Chave de API OpenAI não configurada.');
+            throw new \RuntimeException('Chave de API não configurada. Configure um provider no AI Router (Gestão → AI Router → Providers) ou acesse Configurações → Configurações de IA.');
         }
 
         $payload = json_encode([
@@ -209,7 +333,7 @@ PROMPT;
         curl_close($ch);
 
         if ($error) throw new \RuntimeException("cURL error: {$error}");
-        if ($code >= 400) throw new \RuntimeException("OpenAI API error {$code}: {$body}");
+        if ($code >= 400) throw new \RuntimeException("API error {$code}: {$body}");
 
         $decoded = json_decode($body, true);
         if (!$decoded) throw new \RuntimeException("Resposta inválida da API de IA.");

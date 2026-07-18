@@ -76,9 +76,66 @@
 
       <!-- Aba: IA -->
       <div id="aba-ia" class="config-aba" style="display:none">
+
+        <?php if (!empty($providerAtivo)): ?>
+        <?php
+          $providerLabels = [
+            'openai'     => 'OpenAI',
+            'anthropic'  => 'Anthropic Claude',
+            'google'     => 'Google Gemini',
+            'azure'      => 'Azure OpenAI',
+            'deepseek'   => 'DeepSeek',
+            'mistral'    => 'Mistral AI',
+            'openrouter' => 'OpenRouter',
+            'ollama'     => 'Ollama (Local)',
+            'lmstudio'   => 'LM Studio (Local)',
+          ];
+          $provLabel  = $providerLabels[$providerAtivo->provider_type] ?? ucfirst($providerAtivo->provider_type);
+          $statusIcon = $providerAtivo->status_conexao === 'conectado' ? '\u2713' : ($providerAtivo->status_conexao === 'erro' ? '\u2717' : '\u23F3');
+          $statusCls  = $providerAtivo->status_conexao === 'conectado' ? 'success' : ($providerAtivo->status_conexao === 'erro' ? 'error' : 'warning');
+        ?>
+        <div class="alert alert-info" style="margin-bottom:20px;border-left:4px solid #0d6efd;background:#eff6ff;padding:16px 20px;border-radius:8px;display:flex;align-items:center;gap:16px;">
+          <div style="font-size:28px;">&#129302;</div>
+          <div style="flex:1;">
+            <div style="font-weight:700;color:#0d2244;font-size:14px;margin-bottom:4px;">
+              Chave de IA herdada do AI Router
+            </div>
+            <div style="color:#374151;font-size:13px;">
+              O Copilot está usando o provider <strong><?= htmlspecialchars($providerAtivo->nome) ?></strong>
+              (<?= htmlspecialchars($provLabel) ?>)
+              <?php if ($providerAtivo->api_key_mask): ?>
+                com a chave <code style="background:#e0e7ff;padding:2px 6px;border-radius:4px;font-size:12px;"><?= htmlspecialchars($providerAtivo->api_key_mask) ?></code>
+              <?php endif; ?>
+              configurado no AI Router.
+            </div>
+            <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+              <span style="font-size:12px;color:#6b7280;">Status:</span>
+              <span style="font-size:12px;font-weight:600;color:<?= $statusCls === 'success' ? '#16a34a' : ($statusCls === 'error' ? '#dc2626' : '#d97706') ?>">
+                <?= $providerAtivo->status_conexao === 'conectado' ? '&#10003; Conectado' : ($providerAtivo->status_conexao === 'erro' ? '&#10007; Erro' : '&#9203; Pendente') ?>
+              </span>
+              &nbsp;&middot;&nbsp;
+              <a href="/ai-router/providers" style="font-size:12px;color:#0d6efd;text-decoration:none;">Gerenciar no AI Router &rarr;</a>
+            </div>
+          </div>
+        </div>
+        <?php else: ?>
+        <div class="alert alert-warning" style="margin-bottom:20px;border-left:4px solid #f59e0b;background:#fffbeb;padding:16px 20px;border-radius:8px;display:flex;align-items:center;gap:16px;">
+          <div style="font-size:28px;">&#9888;&#65039;</div>
+          <div style="flex:1;">
+            <div style="font-weight:700;color:#92400e;font-size:14px;margin-bottom:4px;">Nenhum provider de IA configurado</div>
+            <div style="color:#78350f;font-size:13px;">
+              Configure um provider no AI Router para que o Copilot possa gerar sugestões de laudos automaticamente.
+            </div>
+            <div style="margin-top:8px;">
+              <a href="/ai-router/providers" class="btn btn-primary btn-sm" style="font-size:12px;padding:6px 14px;">Configurar no AI Router &rarr;</a>
+            </div>
+          </div>
+        </div>
+        <?php endif; ?>
+
         <form method="POST" action="/configuracoes/ia">
           <div class="card">
-            <div class="card-header-row"><h3 class="card-title"><i class="fa-solid fa-robot"></i> Modelo de IA</h3></div>
+            <div class="card-header-row"><h3 class="card-title"><i class="fa-solid fa-robot"></i> Preferências de Escrita da IA</h3></div>
             <div class="form-group">
               <label class="form-label">Modelo padrão</label>
               <select name="ia_modelo" class="form-control">

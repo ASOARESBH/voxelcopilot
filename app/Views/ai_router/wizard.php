@@ -960,7 +960,42 @@ function showStep3Alert(msg, type) {
 
 // ─── Etapa 4: Configurações ───────────────────────────────────
 function fillConfigStep() {
-  // Valores já preenchidos pelos sliders — apenas garantir
+  // Se estiver editando um provider existente, preenche com os valores salvos
+  const cfg = WIZ._editConfig;
+  if (!cfg) return;
+
+  const setSlider = (id, valId, val, fmt) => {
+    const el = document.getElementById(id);
+    const vEl = document.getElementById(valId);
+    if (el) { el.value = val; }
+    if (vEl) { vEl.textContent = fmt ? fmt(val) : val; }
+  };
+
+  setSlider('cfgTemp',        'cfgTempVal',        cfg.temperatura,  null);
+  setSlider('cfgMaxTokens',   'cfgMaxTokensVal',   cfg.max_tokens,   v => Number(v).toLocaleString());
+  setSlider('cfgTopP',        'cfgTopPVal',        cfg.top_p,        null);
+  setSlider('cfgFreqPenalty', 'cfgFreqPenaltyVal', cfg.freq_penalty, null);
+  setSlider('cfgPresPenalty', 'cfgPresPenaltyVal', cfg.pres_penalty, null);
+
+  const timeoutEl = document.getElementById('cfgTimeout');
+  if (timeoutEl) timeoutEl.value = cfg.timeout_s;
+
+  const retryEl = document.getElementById('cfgRetry');
+  if (retryEl) retryEl.value = cfg.retry;
+
+  const idiomaEl = document.getElementById('cfgIdioma');
+  if (idiomaEl) idiomaEl.value = cfg.idioma;
+
+  const defaultEl = document.getElementById('cfgIsDefault');
+  if (defaultEl) defaultEl.checked = !!cfg.is_default;
+
+  // Modo de operação
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === cfg.modo);
+  });
+
+  // Limpa para não reaplicar na próxima vez que entrar na etapa 4
+  WIZ._editConfig = null;
 }
 
 function selectMode(btn) {
@@ -1243,13 +1278,92 @@ async function saveProvider() {
 }
 
 // ─── Editar Provider Existente ────────────────────────────────
-function editProvider(id, type) {
-  WIZ.editingId = id;
-  WIZ.selectedType = type;
-  WIZ.currentStep = 1;
-  selectProvider(type);
-  renderStep();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+async function editProvider(id, type) {
+  showLoading('Carregando dados do provider...');
+
+  try {
+    const res  = await fetch('/api/ai/provider/' + id);
+    const data = await res.json();
+    hideLoading();
+
+    if (!data.ok) {
+      showToast('Erro ao carregar provider: ' + (data.error || 'Erro desconhecido'), 'error');
+      return;
+    }
+
+    const p = data.provider;
+
+    // 1. Configura o estado global do Wizard
+    WIZ.editingId     = id;
+    WIZ.selectedType  = type;
+    WIZ.models        = data.models || [];
+    WIZ.selectedModel = data.selected_model || null;
+    WIZ.connInfo      = {
+      regiao:      p.regiao      || '',
+      organizacao: p.organizacao || '',
+      conta:       p.conta       || '',
+    };
+
+    // 2. Pré-carrega credData com os campos persistidos
+    //    A API Key é exibida mascarada (nunca em texto puro)
+    WIZ.credData = {
+      nome:         p.nome        || '',
+      api_key:      '',            // nunca exibir a chave real
+      api_key_mask: p.api_key_mask || '',
+      endpoint:     p.endpoint    || '',
+      deployment:   p.deployment  || '',
+      api_version:  p.api_version || '',
+    };
+
+    // 3. Seleciona o provider no passo 1 e vai direto ao passo 2
+    selectProvider(type);
+    WIZ.currentStep = 2;
+    renderStep();
+
+    // 4. Após renderizar os campos de credenciais, preenche os valores
+    setTimeout(() => {
+      // Preenche campos de texto (nome, endpoint, deployment, api_version)
+      ['nome', 'endpoint', 'deployment', 'api_version'].forEach(key => {
+        const el = document.getElementById('cred_' + key);
+        if (el && WIZ.credData[key]) el.value = WIZ.credData[key];
+      });
+
+      // Campo de API Key: placeholder com a máscara, valor vazio
+      const apiKeyEl = document.getElementById('cred_api_key');
+      if (apiKeyEl && p.api_key_mask) {
+        apiKeyEl.placeholder = 'Chave atual: ' + p.api_key_mask + ' (deixe em branco para manter)';
+        apiKeyEl.value = '';
+      }
+
+      // Preenche configurações avançadas (Etapa 4)
+      WIZ._editConfig = {
+        temperatura:  parseFloat(p.temperatura  || 0.1),
+        max_tokens:   parseInt(p.max_tokens     || 4096),
+        timeout_s:    parseInt(p.timeout_s      || 30),
+        retry:        parseInt(p.retry          || 3),
+        top_p:        parseFloat(p.top_p        || 1.0),
+        freq_penalty: parseFloat(p.freq_penalty || 0.0),
+        pres_penalty: parseFloat(p.pres_penalty || 0.0),
+        idioma:       p.idioma  || 'pt',
+        modo:         p.modo    || 'producao',
+        is_default:   p.is_default == 1,
+      };
+
+      // Exibe aviso de edição
+      showStep2Alert(
+        '✏️ Editando provider existente. ' +
+        (p.api_key_mask ? 'Chave atual: ' + p.api_key_mask + '. Deixe o campo em branco para mantê-la.' : '') +
+        ' Clique em "Testar Conexão" para validar ou "Próximo" para avançar.',
+        'info'
+      );
+    }, 50);
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  } catch (e) {
+    hideLoading();
+    showToast('Erro ao carregar provider: ' + e.message, 'error');
+  }
 }
 
 // ─── Excluir Provider ─────────────────────────────────────────

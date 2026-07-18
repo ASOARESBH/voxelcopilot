@@ -205,6 +205,85 @@ class ProviderWizardController extends Controller
         $this->json(['ok' => true, 'provider_id' => $providerId]);
     }
 
+    // ─── GET /api/ai/provider/{id} ─────────────────────────────
+    public function apiGetProvider(int $id): void
+    {
+        $stmt = $this->db->prepare(
+            "SELECT id, nome, provider_type, api_key_mask, endpoint, deployment, api_version,
+                    regiao, organizacao, conta, modo, is_default,
+                    temperatura, max_tokens, timeout_s, retry, top_p,
+                    freq_penalty, pres_penalty, idioma, wizard_step, wizard_completo,
+                    status_conexao
+             FROM cop_ai_providers
+             WHERE id = ? AND user_id = ?
+             LIMIT 1"
+        );
+        $stmt->execute([$id, $this->userId]);
+        $provider = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$provider) {
+            $this->json(['ok' => false, 'error' => 'Provider não encontrado'], 404);
+            return;
+        }
+
+        // Busca modelos salvos deste provider
+        $stmtM = $this->db->prepare(
+            "SELECT model_id, model_name, model_family, context_window,
+                    cap_chat, cap_vision, cap_streaming, cap_json_mode,
+                    cap_function_call, cap_structured_out, cap_reasoning, cap_long_context,
+                    is_recommended, is_selected
+             FROM cop_ai_provider_models
+             WHERE provider_id = ? AND user_id = ?
+             ORDER BY is_recommended DESC, model_name ASC"
+        );
+        $stmtM->execute([$id, $this->userId]);
+        $models = $stmtM->fetchAll(\PDO::FETCH_ASSOC);
+
+        // Normaliza modelos para o formato esperado pelo JS
+        $modelsNorm = array_map(function($m) {
+            return [
+                'id'             => $m['model_id'],
+                'model_id'       => $m['model_id'],
+                'name'           => $m['model_name'],
+                'model_name'     => $m['model_name'],
+                'family'         => $m['model_family'],
+                'context_window' => (int)$m['context_window'],
+                'cap_chat'       => (int)$m['cap_chat'],
+                'cap_vision'     => (int)$m['cap_vision'],
+                'cap_streaming'  => (int)$m['cap_streaming'],
+                'cap_json'       => (int)$m['cap_json_mode'],
+                'cap_json_mode'  => (int)$m['cap_json_mode'],
+                'cap_functions'  => (int)$m['cap_function_call'],
+                'cap_function_call' => (int)$m['cap_function_call'],
+                'cap_structured' => (int)$m['cap_structured_out'],
+                'cap_structured_out' => (int)$m['cap_structured_out'],
+                'cap_reasoning'  => (int)$m['cap_reasoning'],
+                'cap_long_ctx'   => (int)$m['cap_long_context'],
+                'cap_long_context' => (int)$m['cap_long_context'],
+                'recommended'    => (int)$m['is_recommended'],
+                'is_recommended' => (int)$m['is_recommended'],
+                'selected'       => (int)$m['is_selected'],
+                'is_selected'    => (int)$m['is_selected'],
+            ];
+        }, $models);
+
+        // Encontra o modelo selecionado
+        $selectedModel = null;
+        foreach ($modelsNorm as $m) {
+            if ($m['selected']) { $selectedModel = $m['id']; break; }
+        }
+        if (!$selectedModel && !empty($modelsNorm)) {
+            $selectedModel = $modelsNorm[0]['id'];
+        }
+
+        $this->json([
+            'ok'             => true,
+            'provider'       => $provider,
+            'models'         => $modelsNorm,
+            'selected_model' => $selectedModel,
+        ]);
+    }
+
     // ─── POST /ai-router/providers/excluir ───────────────────
     public function excluir(): void
     {

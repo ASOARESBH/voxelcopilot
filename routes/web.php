@@ -141,6 +141,7 @@ Router::post('/api/ai/provider/discover-models', 'ProviderWizardController@apiDi
 Router::post('/api/ai/provider/validate',        'ProviderWizardController@apiValidate');
 Router::get('/api/ai/provider/models',           'ProviderWizardController@apiModels');
 Router::get('/api/ai/provider/capabilities',     'ProviderWizardController@apiCapabilities');
+Router::get('/api/ai/provider/{id}',             'ProviderWizardController@apiGetProvider');
 Router::get('/ai-router/modelos',                'AiRouterController@modelos');
 Router::post('/ai-router/modelos/salvar',        'AiRouterController@salvarModelo');
 Router::get('/ai-router/prompt-base',            'AiRouterController@promptBase');

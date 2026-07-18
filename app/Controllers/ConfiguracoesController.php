@@ -42,13 +42,30 @@ class ConfiguracoesController extends Controller {
             // Tabelas ainda não existem — migration pendente
         }
 
+        // Busca provider ativo do AI Router para exibir na aba de IA
+        $providerAtivo = null;
+        try {
+            $stmtP = $pdo->prepare("
+                SELECT nome, provider_type, api_key_mask, is_default, status_conexao
+                FROM cop_ai_providers
+                WHERE user_id = :uid AND wizard_completo = 1
+                ORDER BY is_default DESC, updated_at DESC
+                LIMIT 1
+            ");
+            $stmtP->execute(['uid' => $userId]);
+            $providerAtivo = $stmtP->fetch(\PDO::FETCH_OBJ);
+        } catch (\Exception $e) {
+            // Tabela ainda não existe
+        }
+
         $this->view('configuracoes/index', [
-            'title'        => 'Configurações — VOXEL Copilot',
-            'pageTitle'    => 'Configurações',
-            'pageSubtitle' => 'Perfil, preferências e configurações de IA',
-            'user'         => $user,
-            'autorizacoes' => $autorizacoes,
-            'stats'        => $stats,
+            'title'         => 'Configurações — VOXEL Copilot',
+            'pageTitle'     => 'Configurações',
+            'pageSubtitle'  => 'Perfil, preferências e configurações de IA',
+            'user'          => $user,
+            'autorizacoes'  => $autorizacoes,
+            'stats'         => $stats,
+            'providerAtivo' => $providerAtivo,
         ]);
     }
 
