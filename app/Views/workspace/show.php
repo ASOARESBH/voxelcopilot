@@ -322,6 +322,74 @@ $isRadiologista = !empty($layoutRadiologista);
 
         <?php endif; ?>
 
+        <!-- ═══════════════════════════════════════════════════════════
+             EXAMES ANTERIORES — Abas por laudo
+             ═══════════════════════════════════════════════════════════ -->
+        <?php if (!empty($examesAnteriores)): ?>
+        <div class="ws-section-card ws-exames-anteriores" id="ws-exames-ant">
+            <div class="ws-section-header">
+                <div class="ws-section-title">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    Exames Anteriores
+                    <span class="ws-exames-badge"><?= count($examesAnteriores) ?></span>
+                </div>
+                <div class="ws-section-actions">
+                    <span class="ws-exames-hint">Laudos anteriores deste paciente</span>
+                </div>
+            </div>
+            <!-- Abas de navegação -->
+            <div class="ws-exames-tabs" id="ws-exames-tabs">
+                <?php foreach ($examesAnteriores as $i => $ex): ?>
+                <button class="ws-exame-tab <?= $i === 0 ? 'active' : '' ?>"
+                        onclick="abrirAbaExame(<?= $i ?>)"
+                        data-idx="<?= $i ?>">
+                    <span class="ws-exame-tab-mod"><?= htmlspecialchars($ex->modalidade ?? '?') ?></span>
+                    <span class="ws-exame-tab-data"><?= $ex->assinado_em ? date('d/m/Y', strtotime($ex->assinado_em)) : date('d/m/Y', strtotime($ex->created_at)) ?></span>
+                </button>
+                <?php endforeach; ?>
+            </div>
+            <!-- Conteúdo das abas -->
+            <?php foreach ($examesAnteriores as $i => $ex): ?>
+            <div class="ws-exame-content <?= $i === 0 ? 'active' : '' ?>" id="ws-exame-<?= $i ?>">
+                <div class="ws-exame-meta">
+                    <span><i class="fa-solid fa-stethoscope"></i> <?= htmlspecialchars($ex->modalidade ?? 'N/A') ?></span>
+                    <span><i class="fa-solid fa-calendar"></i> <?= $ex->assinado_em ? date('d/m/Y', strtotime($ex->assinado_em)) : '—' ?></span>
+                    <?php if ($ex->cid): ?>
+                    <span><i class="fa-solid fa-tag"></i> CID: <?= htmlspecialchars($ex->cid) ?></span>
+                    <?php endif; ?>
+                    <a href="/workspace/<?= $ex->id ?>" target="_blank" class="ws-exame-link">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Ver laudo
+                    </a>
+                </div>
+                <?php if ($ex->achados): ?>
+                <div class="ws-exame-secao">
+                    <div class="ws-exame-secao-titulo"><i class="fa-solid fa-magnifying-glass"></i> Achados</div>
+                    <div class="ws-exame-texto"><?= nl2br(htmlspecialchars($ex->achados)) ?></div>
+                </div>
+                <?php endif; ?>
+                <?php if ($ex->impressao): ?>
+                <div class="ws-exame-secao">
+                    <div class="ws-exame-secao-titulo"><i class="fa-solid fa-lightbulb"></i> Impressão Diagnóstica</div>
+                    <div class="ws-exame-texto"><?= nl2br(htmlspecialchars($ex->impressao)) ?></div>
+                </div>
+                <?php endif; ?>
+                <?php if ($ex->indicacao): ?>
+                <div class="ws-exame-secao">
+                    <div class="ws-exame-secao-titulo"><i class="fa-solid fa-file-medical"></i> Indicação Clínica</div>
+                    <div class="ws-exame-texto"><?= nl2br(htmlspecialchars($ex->indicacao)) ?></div>
+                </div>
+                <?php endif; ?>
+                <?php if ($ex->recomendacao): ?>
+                <div class="ws-exame-secao">
+                    <div class="ws-exame-secao-titulo"><i class="fa-solid fa-notes-medical"></i> Recomendações</div>
+                    <div class="ws-exame-texto"><?= nl2br(htmlspecialchars($ex->recomendacao)) ?></div>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
         <!-- Assinado em -->
         <?php if ($laudo->status === 'assinado' && $laudo->assinado_em): ?>
         <div class="ws-signed-banner">
@@ -396,19 +464,22 @@ $isRadiologista = !empty($layoutRadiologista);
                 <div class="ws-copilot-model">GPT-4o</div>
             </div>
 
-            <!-- Sugestões rápidas -->
-            <div class="ws-quick-actions">
-                <button class="ws-quick-btn" onclick="sendQuick('Gere uma sugestão de impressão diagnóstica baseada nos achados')">
+            <!-- Sugestões rápidas — todos na mesma linha -->
+            <div class="ws-quick-actions ws-quick-actions-row">
+                <button class="ws-quick-btn" onclick="sendQuick('Gere uma sugestão de impressão diagnóstica baseada nos achados')" title="Gerar Impressão Diagnóstica">
                     <i class="fa-solid fa-lightbulb"></i> Impressão
                 </button>
-                <button class="ws-quick-btn" onclick="sendQuick('Verifique inconsistências e erros no laudo atual')">
+                <button class="ws-quick-btn" onclick="sendQuick('Verifique inconsistências e erros no laudo atual')" title="Revisar Laudo">
                     <i class="fa-solid fa-spell-check"></i> Revisar
                 </button>
-                <button class="ws-quick-btn" onclick="sendQuick('Sugira o CID-10 mais adequado para este caso')">
+                <button class="ws-quick-btn" onclick="sendQuick('Sugira recomendações para o médico solicitante')" title="Sugerir Recomendações">
+                    <i class="fa-solid fa-notes-medical"></i> Recomen.
+                </button>
+                <button class="ws-quick-btn" onclick="sendQuick('Sugira o CID-10 mais adequado para este caso')" title="Sugerir CID-10">
                     <i class="fa-solid fa-tag"></i> CID
                 </button>
-                <button class="ws-quick-btn" onclick="sendQuick('Sugira recomendações para o médico solicitante')">
-                    <i class="fa-solid fa-notes-medical"></i> Recomen.
+                <button class="ws-quick-btn ws-quick-btn-chat" onclick="focarChat()" title="Chat com o Copilot">
+                    <i class="fa-solid fa-comments"></i> Chat
                 </button>
             </div>
 
@@ -733,4 +804,29 @@ document.getElementById('ai-input')?.addEventListener('input', function() {
 // Scroll ao fundo das mensagens ao carregar
 const msgs = document.getElementById('ai-messages');
 if (msgs) msgs.scrollTop = msgs.scrollHeight;
+
+// ══ EXAMES ANTERIORES — troca de abas ══
+function abrirAbaExame(idx) {
+    // Desativa todas as abas e conteúdos
+    document.querySelectorAll('.ws-exame-tab').forEach(function(btn) {
+        btn.classList.remove('active');
+    });
+    document.querySelectorAll('.ws-exame-content').forEach(function(div) {
+        div.classList.remove('active');
+    });
+    // Ativa a aba e conteúdo selecionados
+    var tab = document.querySelector('.ws-exame-tab[data-idx="' + idx + '"]');
+    var content = document.getElementById('ws-exame-' + idx);
+    if (tab) tab.classList.add('active');
+    if (content) content.classList.add('active');
+}
+
+// ══ CHAT — foca o input do Copilot ══
+function focarChat() {
+    var input = document.getElementById('ai-input');
+    if (input) {
+        input.focus();
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
 </script>

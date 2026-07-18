@@ -330,6 +330,52 @@ class WorkspaceController extends Controller {
             $mascarasBiblioteca = [];
         }
 
+        // Busca exames anteriores do mesmo paciente (qualquer modalidade)
+        $examesAnteriores = [];
+        try {
+            $patUid  = $laudo->patient_uid  ?? null;
+            $patNome = $laudo->patient_nome ?? null;
+
+            if ($patUid) {
+                // Busca por patient_uid (mais preciso)
+                $exStmt = $pdo->prepare("
+                    SELECT l.id, l.status, l.achados, l.impressao, l.indicacao,
+                           l.tecnica, l.recomendacao, l.cid, l.assinado_em, l.created_at,
+                           w.modalidade, w.study_uid, w.patient_nome
+                    FROM cop_laudos l
+                    JOIN cop_workspaces w ON w.id = l.workspace_id
+                    WHERE w.patient_uid = :puid
+                      AND l.id != :lid
+                      AND l.status = 'assinado'
+                    ORDER BY l.assinado_em DESC
+                    LIMIT 10
+                ");
+                $exStmt->execute(['puid' => $patUid, 'lid' => $id]);
+                $examesAnteriores = $exStmt->fetchAll();
+            }
+
+            // Fallback: busca por nome do paciente se não achou por UID
+            if (empty($examesAnteriores) && $patNome) {
+                $exStmt2 = $pdo->prepare("
+                    SELECT l.id, l.status, l.achados, l.impressao, l.indicacao,
+                           l.tecnica, l.recomendacao, l.cid, l.assinado_em, l.created_at,
+                           w.modalidade, w.study_uid, w.patient_nome
+                    FROM cop_laudos l
+                    JOIN cop_workspaces w ON w.id = l.workspace_id
+                    WHERE w.patient_nome LIKE :pnome
+                      AND l.id != :lid
+                      AND l.status = 'assinado'
+                    ORDER BY l.assinado_em DESC
+                    LIMIT 10
+                ");
+                $exStmt2->execute(['pnome' => '%' . $patNome . '%', 'lid' => $id]);
+                $examesAnteriores = $exStmt2->fetchAll();
+            }
+        } catch (\Exception $e) {
+            error_log('[Workspace] exames anteriores falhou: ' . $e->getMessage());
+            $examesAnteriores = [];
+        }
+
         $this->view('workspace/show', [
             'title'              => 'Laudo — VOXEL Copilot',
             'pageTitle'          => 'Editor de Laudo',
@@ -342,6 +388,7 @@ class WorkspaceController extends Controller {
             'pacsViewerUrl'      => $pacsViewerUrl,
             'csrf_token'         => $this->csrfToken(),
             'layoutRadiologista' => $layoutRadiologista,
+            'examesAnteriores'   => $examesAnteriores,
         ]);
     }
 
