@@ -110,12 +110,21 @@ Router::post('/pacs',                'PacsController@salvar');
 
 // ─── PLATFORM (SUPER ADMIN) ───────────────────────────────────────────────────
 Router::get('/platform/dashboard',   'Platform\PlatformController@dashboard');
-Router::get('/platform/medicos',     'Platform\PlatformController@medicos');
-Router::get('/platform/medicos/{id}','Platform\PlatformController@medicoShow');
+Router::get('/platform/medicos',                    'Platform\PlatformController@medicos');
+Router::get('/platform/medicos/novo',               'Platform\PlatformController@medicoNovo');
+Router::post('/platform/medicos/criar',             'Platform\PlatformController@medicoCreate');
+Router::get('/platform/medicos/{id}',               'Platform\PlatformController@medicoShow');
+Router::get('/platform/medicos/{id}/editar',        'Platform\PlatformController@medicoEditar');
+Router::post('/platform/medicos/{id}/atualizar',    'Platform\PlatformController@medicoAtualizar');
 Router::get('/platform/medicos/{id}/toggle-status', 'Platform\PlatformController@medicoToggleStatus');
-Router::get('/platform/planos',      'Platform\PlatformController@planos');
-Router::get('/platform/impersonar/{id}', 'Platform\PlatformController@impersonate');
-Router::get('/platform/sair-impersonacao', 'Platform\PlatformController@exitImpersonate');
+Router::get('/platform/grupos',                     'Platform\PlatformController@grupos');
+Router::get('/platform/grupos/novo',                'Platform\PlatformController@grupoNovo');
+Router::post('/platform/grupos/criar',              'Platform\PlatformController@grupoCreate');
+Router::get('/platform/grupos/{id}/editar',         'Platform\PlatformController@grupoEditar');
+Router::post('/platform/grupos/{id}/atualizar',     'Platform\PlatformController@grupoAtualizar');
+Router::get('/platform/planos',                     'Platform\PlatformController@planos');
+Router::get('/platform/impersonar/{id}',            'Platform\PlatformController@impersonate');
+Router::get('/platform/sair-impersonacao',          'Platform\PlatformController@exitImpersonate');
 
 // ─── AI ROUTER ───────────────────────────────────────────────────────────────
 Router::get('/ai-router',                        'AiRouterController@dashboard');

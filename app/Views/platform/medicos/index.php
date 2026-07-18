@@ -10,7 +10,29 @@ function statusBadge(string $status): string {
         <h1>Médicos</h1>
         <p>Total de <?= number_format($total) ?> médico(s) cadastrado(s)</p>
     </div>
+    <div class="page-header-actions">
+        <a href="/platform/grupos" class="btn btn-ghost">
+            <i class="fa-solid fa-layer-group"></i> Grupos
+        </a>
+        <a href="/platform/medicos/novo" class="btn btn-primary">
+            <i class="fa-solid fa-plus"></i> Novo Médico
+        </a>
+    </div>
 </div>
+
+<?php if ($msg === 'criado'): ?>
+<div class="alert alert-success" style="margin-bottom:16px;">
+    <i class="fa-solid fa-circle-check"></i> Médico cadastrado com sucesso!
+</div>
+<?php elseif ($msg === 'atualizado'): ?>
+<div class="alert alert-success" style="margin-bottom:16px;">
+    <i class="fa-solid fa-circle-check"></i> Dados do médico atualizados com sucesso!
+</div>
+<?php elseif ($msg === 'status_atualizado'): ?>
+<div class="alert alert-success" style="margin-bottom:16px;">
+    <i class="fa-solid fa-circle-check"></i> Status atualizado com sucesso!
+</div>
+<?php endif; ?>
 
 <!-- Filtros -->
 <div class="card" style="margin-bottom:20px;">
@@ -30,10 +52,23 @@ function statusBadge(string $status): string {
                     <option value="pendente" <?= $status === 'pendente' ? 'selected' : '' ?>>Pendente</option>
                 </select>
             </div>
+            <?php if (!empty($grupos)): ?>
+            <div style="min-width:160px;">
+                <label class="form-label">Grupo</label>
+                <select name="grupo" class="form-select">
+                    <option value="">Todos os grupos</option>
+                    <?php foreach ($grupos as $g): ?>
+                    <option value="<?= (int)$g->id ?>" <?= $grupo == $g->id ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($g->nome) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
             <button type="submit" class="btn btn-primary">
                 <i class="fa-solid fa-magnifying-glass"></i> Filtrar
             </button>
-            <?php if ($busca || $status): ?>
+            <?php if ($busca || $status || $grupo): ?>
             <a href="/platform/medicos" class="btn btn-ghost">
                 <i class="fa-solid fa-xmark"></i> Limpar
             </a>
@@ -50,6 +85,7 @@ function statusBadge(string $status): string {
                 <tr>
                     <th>Médico</th>
                     <th>CRM</th>
+                    <th>Grupo</th>
                     <th>Especialidades</th>
                     <th>Localização</th>
                     <th>Último Login</th>
@@ -59,17 +95,17 @@ function statusBadge(string $status): string {
             </thead>
             <tbody>
                 <?php if (empty($medicos)): ?>
-                <tr><td colspan="7">
+                <tr><td colspan="8">
                     <div class="empty-state">
                         <div class="empty-state-icon"><i class="fa-solid fa-user-doctor"></i></div>
                         <h3>Nenhum médico encontrado</h3>
-                        <p>Tente ajustar os filtros de busca.</p>
+                        <p>Tente ajustar os filtros ou <a href="/platform/medicos/novo" style="color:var(--blue-600);">cadastre um novo médico</a>.</p>
                     </div>
                 </td></tr>
                 <?php else: ?>
                 <?php foreach ($medicos as $m): ?>
                 <?php
-                    $espec = json_decode($m->especialidades ?? '[]', true) ?? [];
+                    $espec    = json_decode($m->especialidades ?? '[]', true) ?? [];
                     $especStr = !empty($espec) ? implode(', ', array_slice($espec, 0, 2)) . (count($espec) > 2 ? ' +' . (count($espec)-2) : '') : '—';
                 ?>
                 <tr>
@@ -89,13 +125,16 @@ function statusBadge(string $status): string {
                         </span>
                         <?php else: ?><span style="color:var(--muted);">—</span><?php endif; ?>
                     </td>
-                    <td style="font-size:.78rem;color:var(--text-2);max-width:220px;">
-                        <?= htmlspecialchars($especStr) ?>
+                    <td>
+                        <?php if (!empty($m->grupo_nome)): ?>
+                        <span style="font-size:.75rem;font-weight:600;padding:2px 9px;border-radius:20px;color:#fff;background:<?= htmlspecialchars($m->grupo_cor ?? '#1a56db') ?>;">
+                            <?= htmlspecialchars($m->grupo_nome) ?>
+                        </span>
+                        <?php else: ?><span style="color:var(--muted);font-size:.78rem;">—</span><?php endif; ?>
                     </td>
+                    <td style="font-size:.78rem;color:var(--text-2);max-width:200px;"><?= htmlspecialchars($especStr) ?></td>
                     <td style="font-size:.78rem;color:var(--text-2);">
-                        <?php if ($m->cidade): ?>
-                        <?= htmlspecialchars($m->cidade) ?>/<?= htmlspecialchars($m->estado ?? '') ?>
-                        <?php else: ?>—<?php endif; ?>
+                        <?= ($m->cidade ? htmlspecialchars($m->cidade) . '/' . htmlspecialchars($m->estado ?? '') : '—') ?>
                     </td>
                     <td style="font-size:.78rem;color:var(--muted);">
                         <?= $m->ultimo_login ? date('d/m/Y H:i', strtotime($m->ultimo_login)) : 'Nunca' ?>
@@ -105,6 +144,10 @@ function statusBadge(string $status): string {
                         <div style="display:flex;gap:5px;">
                             <a href="/platform/medicos/<?= (int)$m->id ?>" class="btn btn-ghost btn-xs" title="Ver detalhes">
                                 <i class="fa-solid fa-eye"></i>
+                            </a>
+                            <a href="/platform/medicos/<?= (int)$m->id ?>/editar" class="btn btn-ghost btn-xs"
+                               title="Editar médico" style="color:var(--blue-600);">
+                                <i class="fa-solid fa-pen-to-square"></i>
                             </a>
                             <a href="/platform/impersonar/<?= (int)$m->id ?>" class="btn btn-warning btn-xs" title="Ver como médico">
                                 <i class="fa-solid fa-user-secret"></i>
@@ -128,7 +171,7 @@ function statusBadge(string $status): string {
     <?php if ($totalPages > 1): ?>
     <div class="pagination">
         <?php if ($page > 1): ?>
-        <a href="?page=<?= $page-1 ?>&busca=<?= urlencode($busca) ?>&status=<?= urlencode($status) ?>">
+        <a href="?page=<?= $page-1 ?>&busca=<?= urlencode($busca) ?>&status=<?= urlencode($status) ?>&grupo=<?= urlencode($grupo) ?>">
             <i class="fa-solid fa-chevron-left"></i>
         </a>
         <?php else: ?>
@@ -136,12 +179,12 @@ function statusBadge(string $status): string {
         <?php endif; ?>
 
         <?php for ($p = max(1, $page-2); $p <= min($totalPages, $page+2); $p++): ?>
-        <a href="?page=<?= $p ?>&busca=<?= urlencode($busca) ?>&status=<?= urlencode($status) ?>"
+        <a href="?page=<?= $p ?>&busca=<?= urlencode($busca) ?>&status=<?= urlencode($status) ?>&grupo=<?= urlencode($grupo) ?>"
            class="<?= $p === $page ? 'active' : '' ?>"><?= $p ?></a>
         <?php endfor; ?>
 
         <?php if ($page < $totalPages): ?>
-        <a href="?page=<?= $page+1 ?>&busca=<?= urlencode($busca) ?>&status=<?= urlencode($status) ?>">
+        <a href="?page=<?= $page+1 ?>&busca=<?= urlencode($busca) ?>&status=<?= urlencode($status) ?>&grupo=<?= urlencode($grupo) ?>">
             <i class="fa-solid fa-chevron-right"></i>
         </a>
         <?php else: ?>
