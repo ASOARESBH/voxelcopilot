@@ -257,20 +257,63 @@ class WorkspaceController extends Controller {
         }
 
         // Busca grupo do médico para determinar layout
+        // 3 estratégias em cascata para máxima compatibilidade com banco sem migration
         $layoutRadiologista = false;
+        $grupoNome = '';
+
+        // Estratégia 1: JOIN via cop_users.grupo_id (requer migration 2026-07-17)
         try {
-            $gStmt = $pdo->prepare("
-                SELECT g.nome FROM cop_grupos_medicos g
-                INNER JOIN cop_users u ON u.grupo_id = g.id
-                WHERE u.id = :uid LIMIT 1
-            ");
+            $gStmt = $pdo->prepare(
+                "SELECT g.nome FROM cop_grupos_medicos g
+                 INNER JOIN cop_users u ON u.grupo_id = g.id
+                 WHERE u.id = :uid LIMIT 1"
+            );
             $gStmt->execute(['uid' => $medicoId]);
             $gRow = $gStmt->fetch();
-            $grupoNome = $gRow ? strtolower($gRow->nome) : '';
-            $layoutRadiologista = (strpos($grupoNome, 'radiolog') !== false);
+            if ($gRow && $gRow->nome) {
+                $grupoNome = strtolower($gRow->nome);
+            }
         } catch (\Exception $e) {
-            $layoutRadiologista = false;
+            error_log('[Workspace] grupo estrategia 1 falhou: ' . $e->getMessage());
         }
+
+        // Estratégia 2: tabela de vínculo N:N cop_medico_grupos
+        if (!$grupoNome) {
+            try {
+                $gStmt2 = $pdo->prepare(
+                    "SELECT g.nome FROM cop_grupos_medicos g
+                     INNER JOIN cop_medico_grupos mg ON mg.grupo_id = g.id
+                     WHERE mg.user_id = :uid LIMIT 1"
+                );
+                $gStmt2->execute(['uid' => $medicoId]);
+                $gRow2 = $gStmt2->fetch();
+                if ($gRow2 && $gRow2->nome) {
+                    $grupoNome = strtolower($gRow2->nome);
+                }
+            } catch (\Exception $e) {
+                error_log('[Workspace] grupo estrategia 2 falhou: ' . $e->getMessage());
+            }
+        }
+
+        // Estratégia 3: verifica especialidades do médico como último recurso
+        if (!$grupoNome) {
+            try {
+                $espStmt = $pdo->prepare("SELECT especialidades FROM cop_users WHERE id = :uid LIMIT 1");
+                $espStmt->execute(['uid' => $medicoId]);
+                $espRow = $espStmt->fetch();
+                $esp = strtolower($espRow->especialidades ?? '');
+                if (strpos($esp, 'radiolog') !== false ||
+                    strpos($esp, 'tomografia') !== false ||
+                    strpos($esp, 'ressonancia') !== false ||
+                    strpos($esp, 'medicina nuclear') !== false) {
+                    $grupoNome = 'radiologistas';
+                }
+            } catch (\Exception $e) {
+                error_log('[Workspace] grupo estrategia 3 falhou: ' . $e->getMessage());
+            }
+        }
+
+        $layoutRadiologista = (strpos($grupoNome, 'radiolog') !== false);
 
         // Busca máscaras da biblioteca para o seletor de templates
         $mascarasBiblioteca = [];
