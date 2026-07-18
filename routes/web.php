@@ -178,6 +178,7 @@ Router::get('/api/pacs/buscar',           'PacsController@buscar');
 // ─── API TEMPLATES (AJAX) ───────────────────────────────────────────────────
 Router::get('/api/templates/{id}/corpo',  'TemplatesController@getCorpo');
 Router::get('/api/mascaras/buscar',        'MascarasController@buscar');
+Router::get('/api/mascaras/{id}/corpo',    'MascarasController@getCorpo');
 
 // ─── API COPILOT (AJAX) ──────────────────────────────────────────────────────
 Router::post('/api/copilot/chat',         'CopilotApiController@chat');

@@ -344,6 +344,18 @@ class MascarasController extends Controller {
     // ──────────────────────────────────────────────────────────────────────────
     // API BUSCA — GET /api/mascaras/buscar?q=...&mod=TC
     // ──────────────────────────────────────────────────────────────────────────
+    // GET CORPO — GET /api/mascaras/{id}/corpo
+    public function getCorpo(int $id): void {
+        AuthMiddleware::handle();
+        $pdo  = Database::getInstance();
+        $stmt = $pdo->prepare("SELECT corpo, secao_analise FROM cop_mascaras_biblioteca WHERE id = :id AND ativo = 1 LIMIT 1");
+        $stmt->execute(["id" => $id]);
+        $row = $stmt->fetch();
+        if (!$row) { $this->json(["ok" => false, "msg" => "Mascara nao encontrada."], 404); return; }
+        $corpo = $row->secao_analise ?: $row->corpo ?: "";
+        $this->json(["ok" => true, "corpo" => $corpo]);
+    }
+
     public function buscar(): void {
         AuthMiddleware::handle();
 

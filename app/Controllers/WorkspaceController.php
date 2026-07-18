@@ -256,16 +256,49 @@ class WorkspaceController extends Controller {
             }
         }
 
+        // Busca grupo do médico para determinar layout
+        $layoutRadiologista = false;
+        try {
+            $gStmt = $pdo->prepare("
+                SELECT g.nome FROM cop_grupos_medicos g
+                INNER JOIN cop_users u ON u.grupo_id = g.id
+                WHERE u.id = :uid LIMIT 1
+            ");
+            $gStmt->execute(['uid' => $medicoId]);
+            $gRow = $gStmt->fetch();
+            $grupoNome = $gRow ? strtolower($gRow->nome) : '';
+            $layoutRadiologista = (strpos($grupoNome, 'radiolog') !== false);
+        } catch (\Exception $e) {
+            $layoutRadiologista = false;
+        }
+
+        // Busca máscaras da biblioteca para o seletor de templates
+        $mascarasBiblioteca = [];
+        try {
+            $maskStmt = $pdo->prepare("
+                SELECT id, nome, modalidade FROM cop_mascaras_biblioteca
+                WHERE ativo = 1
+                ORDER BY modalidade ASC, nome ASC
+                LIMIT 300
+            ");
+            $maskStmt->execute();
+            $mascarasBiblioteca = $maskStmt->fetchAll();
+        } catch (\Exception $e) {
+            $mascarasBiblioteca = [];
+        }
+
         $this->view('workspace/show', [
-            'title'         => 'Laudo — VOXEL Copilot',
-            'pageTitle'     => 'Editor de Laudo',
-            'pageSubtitle'  => $laudo->patient_nome ?? $laudo->study_uid ?? 'Novo Laudo',
-            'laudo'         => $laudo,
-            'templates'     => $templates,
-            'autotextos'    => $autotextos,
-            'conversas'     => $conversas,
-            'pacsViewerUrl' => $pacsViewerUrl,
-            'csrf_token'    => $this->csrfToken(),
+            'title'              => 'Laudo — VOXEL Copilot',
+            'pageTitle'          => 'Editor de Laudo',
+            'pageSubtitle'       => $laudo->patient_nome ?? $laudo->study_uid ?? 'Novo Laudo',
+            'laudo'              => $laudo,
+            'templates'          => $templates,
+            'mascarasBiblioteca' => $mascarasBiblioteca,
+            'autotextos'         => $autotextos,
+            'conversas'          => $conversas,
+            'pacsViewerUrl'      => $pacsViewerUrl,
+            'csrf_token'         => $this->csrfToken(),
+            'layoutRadiologista' => $layoutRadiologista,
         ]);
     }
 

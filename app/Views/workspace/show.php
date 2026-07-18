@@ -1,6 +1,8 @@
 <?php
 // Injeta workspace.css via extraCss
-$extraCss = ['/assets/css/workspace.css?v=2.0.0'];
+$extraCss = ['/assets/css/workspace.css?v=2.1.0'];
+// $layoutRadiologista vem do controller — true se grupo contém "radiolog"
+$isRadiologista = !empty($layoutRadiologista);
 ?>
 
 <!-- ── WORKSPACE TOPBAR ── -->
@@ -31,14 +33,63 @@ $extraCss = ['/assets/css/workspace.css?v=2.0.0'];
     </div>
 
     <div class="ws-topbar-actions">
-        <!-- Troca de template -->
-        <?php if (!empty($templates) && $laudo->status === 'rascunho'): ?>
-        <select class="ws-template-select" id="template-select" onchange="trocarTemplate(this.value)" title="Aplicar template">
-            <option value="">Template...</option>
-            <?php foreach ($templates as $t): ?>
-            <option value="<?= (int)$t->id ?>"><?= htmlspecialchars($t->nome) ?></option>
-            <?php endforeach; ?>
-        </select>
+
+        <!-- ── BUSCAR TEMPLATE (substitui o <select> antigo) ── -->
+        <?php if ($laudo->status === 'rascunho' && (!empty($templates) || !empty($mascarasBiblioteca))): ?>
+        <div class="ws-template-search-wrap" id="tpl-wrap">
+            <div class="ws-template-search-box" onclick="abrirBuscaTemplate()" id="tpl-box">
+                <i class="fa-solid fa-magnifying-glass" style="color:var(--muted);font-size:.8rem;"></i>
+                <span id="tpl-placeholder">Buscar Template...</span>
+            </div>
+            <div class="ws-template-dropdown" id="tpl-dropdown" style="display:none;">
+                <div class="ws-template-search-input-wrap">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="tpl-search-input" placeholder="Buscar por nome ou máscara..."
+                        oninput="filtrarTemplates(this.value)" autocomplete="off">
+                </div>
+                <div class="ws-template-list" id="tpl-list">
+                    <?php if (!empty($templates)): ?>
+                    <div class="ws-tpl-group-label">Meus Templates</div>
+                    <?php foreach ($templates as $t): ?>
+                    <div class="ws-tpl-item" data-id="<?= (int)$t->id ?>" data-tipo="template"
+                         data-nome="<?= htmlspecialchars(strtolower($t->nome)) ?>"
+                         onclick="selecionarTemplate(<?= (int)$t->id ?>, 'template', <?= json_encode($t->nome) ?>)">
+                        <i class="fa-regular fa-file-lines" style="color:var(--blue-500);"></i>
+                        <div>
+                            <div class="ws-tpl-nome"><?= htmlspecialchars($t->nome) ?></div>
+                            <?php if ($t->modalidade): ?>
+                            <div class="ws-tpl-meta"><?= htmlspecialchars($t->modalidade) ?></div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
+
+                    <?php if (!empty($mascarasBiblioteca)): ?>
+                    <div class="ws-tpl-group-label">Biblioteca de Máscaras</div>
+                    <?php foreach ($mascarasBiblioteca as $m): ?>
+                    <div class="ws-tpl-item" data-id="<?= (int)$m->id ?>" data-tipo="mascara"
+                         data-nome="<?= htmlspecialchars(strtolower($m->nome)) ?>"
+                         onclick="selecionarTemplate(<?= (int)$m->id ?>, 'mascara', <?= json_encode($m->nome) ?>)">
+                        <i class="fa-solid fa-layer-group" style="color:var(--blue-400);"></i>
+                        <div>
+                            <div class="ws-tpl-nome"><?= htmlspecialchars($m->nome) ?></div>
+                            <?php if ($m->modalidade): ?>
+                            <div class="ws-tpl-meta"><?= htmlspecialchars($m->modalidade) ?></div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
+
+                    <?php if (empty($templates) && empty($mascarasBiblioteca)): ?>
+                    <div style="padding:16px;text-align:center;color:var(--muted);font-size:.8rem;">
+                        Nenhum template disponível
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
         <?php endif; ?>
 
         <!-- Viewer PACS -->
@@ -72,6 +123,78 @@ $extraCss = ['/assets/css/workspace.css?v=2.0.0'];
 
     <!-- ── EDITOR ── -->
     <div class="ws-editor">
+
+        <?php if ($isRadiologista): ?>
+        <!-- ═══════════════════════════════════════════════════════════
+             LAYOUT RADIOLOGISTA — Apenas Achados + Impressão Diagnóstica
+             ═══════════════════════════════════════════════════════════ -->
+
+        <!-- Achados (expandido) -->
+        <div class="ws-section-card">
+            <div class="ws-section-header">
+                <div class="ws-section-title">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    Achados
+                </div>
+                <?php if ($laudo->status === 'rascunho'): ?>
+                <div class="ws-section-actions">
+                    <button class="ws-btn ws-btn-ai ws-btn-xs" onclick="gerarSugestaoIA()" id="btn-ia-achados">
+                        <i class="fa-solid fa-brain"></i> Sugerir com IA
+                    </button>
+                    <?php if (!empty($autotextos)): ?>
+                    <button class="ws-btn ws-btn-ghost ws-btn-xs" onclick="toggleAutotextos()">
+                        <i class="fa-solid fa-bolt"></i> Autotextos
+                    </button>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php if (!empty($autotextos)): ?>
+            <div class="ws-autotextos" id="autotextos-panel" style="display:none;">
+                <?php foreach ($autotextos as $at): ?>
+                <button class="ws-autotexto-btn" onclick="inserirAutotexto('achados', <?= json_encode($at->texto) ?>)">
+                    <strong><?= htmlspecialchars($at->atalho) ?></strong>
+                    <span><?= htmlspecialchars(substr($at->texto, 0, 60)) ?>...</span>
+                </button>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+            <div class="ws-section-body">
+                <textarea class="ws-textarea" id="achados" name="achados"
+                    placeholder="Descreva os achados do exame em detalhes..."
+                    style="min-height:340px;"
+                    <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
+                ><?= htmlspecialchars($laudo->achados ?? '') ?></textarea>
+            </div>
+        </div>
+
+        <!-- Impressão Diagnóstica -->
+        <div class="ws-section-card">
+            <div class="ws-section-header">
+                <div class="ws-section-title">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    Impressão Diagnóstica
+                </div>
+            </div>
+            <div class="ws-section-body">
+                <textarea class="ws-textarea" id="impressao" name="impressao"
+                    placeholder="Conclusão diagnóstica..."
+                    style="min-height:130px;"
+                    <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
+                ><?= htmlspecialchars($laudo->impressao ?? '') ?></textarea>
+            </div>
+        </div>
+
+        <!-- Campos ocultos para o auto-save (mantém compatibilidade) -->
+        <textarea id="indicacao"   name="indicacao"   style="display:none;"><?= htmlspecialchars($laudo->indicacao   ?? '') ?></textarea>
+        <textarea id="tecnica"     name="tecnica"     style="display:none;"><?= htmlspecialchars($laudo->tecnica     ?? '') ?></textarea>
+        <textarea id="recomendacao" name="recomendacao" style="display:none;"><?= htmlspecialchars($laudo->recomendacao ?? '') ?></textarea>
+        <input    id="cid"         name="cid"         type="hidden" value="<?= htmlspecialchars($laudo->cid ?? '') ?>">
+
+        <?php else: ?>
+        <!-- ═══════════════════════════════════════════════════════════
+             LAYOUT PADRÃO — Todos os campos
+             ═══════════════════════════════════════════════════════════ -->
 
         <!-- Indicação -->
         <div class="ws-section-card">
@@ -127,7 +250,6 @@ $extraCss = ['/assets/css/workspace.css?v=2.0.0'];
                 </div>
                 <?php endif; ?>
             </div>
-            <!-- Autotextos dropdown -->
             <?php if (!empty($autotextos)): ?>
             <div class="ws-autotextos" id="autotextos-panel" style="display:none;">
                 <?php foreach ($autotextos as $at): ?>
@@ -198,6 +320,8 @@ $extraCss = ['/assets/css/workspace.css?v=2.0.0'];
             </div>
         </div>
 
+        <?php endif; ?>
+
         <!-- Assinado em -->
         <?php if ($laudo->status === 'assinado' && $laudo->assinado_em): ?>
         <div class="ws-signed-banner">
@@ -250,6 +374,14 @@ $extraCss = ['/assets/css/workspace.css?v=2.0.0'];
                     <span class="ws-study-label">Criado em</span>
                     <span class="ws-study-value"><?= date('d/m/Y H:i', strtotime($laudo->created_at)) ?></span>
                 </div>
+                <?php if ($isRadiologista): ?>
+                <div class="ws-study-row">
+                    <span class="ws-study-label">Layout</span>
+                    <span class="ws-study-value" style="color:var(--blue-600);font-size:.75rem;font-weight:600;">
+                        <i class="fa-solid fa-x-ray"></i> Radiologista
+                    </span>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -351,12 +483,12 @@ function autoSave() {
 function salvarLaudo() {
     const data = new FormData();
     data.append('csrf_token',   csrfToken);
-    data.append('indicacao',    document.getElementById('indicacao').value);
-    data.append('tecnica',      document.getElementById('tecnica').value);
-    data.append('achados',      document.getElementById('achados').value);
-    data.append('impressao',    document.getElementById('impressao').value);
-    data.append('recomendacao', document.getElementById('recomendacao').value);
-    data.append('cid',          document.getElementById('cid').value);
+    data.append('indicacao',    document.getElementById('indicacao')?.value   || '');
+    data.append('tecnica',      document.getElementById('tecnica')?.value     || '');
+    data.append('achados',      document.getElementById('achados')?.value     || '');
+    data.append('impressao',    document.getElementById('impressao')?.value   || '');
+    data.append('recomendacao', document.getElementById('recomendacao')?.value|| '');
+    data.append('cid',          document.getElementById('cid')?.value         || '');
 
     fetch('/workspace/' + laudoId + '/salvar', { method: 'POST', body: data })
         .then(r => r.json())
@@ -411,27 +543,77 @@ function assinarLaudo() {
     }, 600);
 }
 
-// ── TROCAR TEMPLATE ───────────────────────────────────────────
-function trocarTemplate(templateId) {
-    if (!templateId || isReadonly) return;
-    if (!confirm('Aplicar este template irá substituir o conteúdo atual dos Achados. Deseja continuar?')) {
-        document.getElementById('template-select').value = '';
+// ── BUSCAR TEMPLATE ───────────────────────────────────────────
+function abrirBuscaTemplate() {
+    if (isReadonly) return;
+    const dd = document.getElementById('tpl-dropdown');
+    if (!dd) return;
+    dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+    if (dd.style.display === 'block') {
+        const inp = document.getElementById('tpl-search-input');
+        if (inp) { inp.value = ''; filtrarTemplates(''); inp.focus(); }
+    }
+}
+
+function filtrarTemplates(q) {
+    q = q.toLowerCase().trim();
+    const items = document.querySelectorAll('#tpl-list .ws-tpl-item');
+    items.forEach(function(item) {
+        const nome = item.getAttribute('data-nome') || '';
+        item.style.display = (!q || nome.includes(q)) ? 'flex' : 'none';
+    });
+    // Oculta labels de grupo se todos os itens do grupo estiverem ocultos
+    const groups = document.querySelectorAll('#tpl-list .ws-tpl-group-label');
+    groups.forEach(function(label) {
+        let next = label.nextElementSibling;
+        let hasVisible = false;
+        while (next && !next.classList.contains('ws-tpl-group-label')) {
+            if (next.style.display !== 'none') hasVisible = true;
+            next = next.nextElementSibling;
+        }
+        label.style.display = hasVisible ? 'block' : 'none';
+    });
+}
+
+function selecionarTemplate(id, tipo, nome) {
+    if (isReadonly) return;
+    const dd = document.getElementById('tpl-dropdown');
+    if (dd) dd.style.display = 'none';
+
+    const ph = document.getElementById('tpl-placeholder');
+    if (ph) ph.textContent = nome;
+
+    const endpoint = tipo === 'mascara'
+        ? '/api/mascaras/' + id + '/corpo'
+        : '/api/templates/' + id + '/corpo';
+
+    if (!confirm('Aplicar "' + nome + '" irá substituir o conteúdo atual dos Achados. Deseja continuar?')) {
+        if (ph) ph.textContent = 'Buscar Template...';
         return;
     }
 
-    fetch('/api/templates/' + templateId + '/corpo')
+    fetch(endpoint)
         .then(r => r.json())
         .then(function(res) {
             if (res.ok && res.corpo !== undefined) {
-                document.getElementById('achados').value = res.corpo;
-                markDirty();
+                const el = document.getElementById('achados');
+                if (el) { el.value = res.corpo; markDirty(); }
             }
-            document.getElementById('template-select').value = '';
+            if (ph) ph.textContent = 'Buscar Template...';
         })
         .catch(function() {
-            document.getElementById('template-select').value = '';
+            if (ph) ph.textContent = 'Buscar Template...';
         });
 }
+
+// Fecha dropdown ao clicar fora
+document.addEventListener('click', function(e) {
+    const wrap = document.getElementById('tpl-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+        const dd = document.getElementById('tpl-dropdown');
+        if (dd) dd.style.display = 'none';
+    }
+});
 
 // ── AUTOTEXTOS ────────────────────────────────────────────────
 function toggleAutotextos() {
@@ -489,7 +671,6 @@ function sendChat() {
     data.append('csrf_token',  csrfToken);
     data.append('mensagem',    msg);
     data.append('workspace_id', workspaceId);
-    // Contexto do laudo atual
     data.append('indicacao',   document.getElementById('indicacao')?.value  || '');
     data.append('achados',     document.getElementById('achados')?.value    || '');
     data.append('impressao',   document.getElementById('impressao')?.value  || '');
