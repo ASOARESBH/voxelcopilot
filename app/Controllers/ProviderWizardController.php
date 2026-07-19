@@ -17,7 +17,9 @@ class ProviderWizardController extends Controller
         AuthMiddleware::handle();
         $this->db     = Database::getInstance();
         $this->userId = Auth::userId();
-        $appKey       = defined('APP_KEY') ? APP_KEY : 'voxelcopilot_aes_key_2026';
+        // Usa $_ENV['APP_KEY'] (carregado pelo bootstrap via .env)
+        // Fallback: constante APP_KEY se definida, ou chave fixa de emergência
+        $appKey       = $_ENV['APP_KEY'] ?? (defined('APP_KEY') ? APP_KEY : 'voxelcopilot_aes_key_2026');
         $this->encKey = hash('sha256', $appKey, true);
     }
 
@@ -88,6 +90,23 @@ class ProviderWizardController extends Controller
             $data['deployment']    ?? '',
             $data['api_version']   ?? ''
         );
+
+        // Persiste o status da conexão no banco após validação
+        $providerId = isset($data['provider_id']) ? (int)$data['provider_id'] : 0;
+        if ($providerId) {
+            $statusConexao = ($result['ok'] !== false) ? 'conectado' : 'erro';
+            $latencia      = $result['latencia_ms'] ?? null;
+            try {
+                $this->db->prepare(
+                    "UPDATE cop_ai_providers
+                     SET status_conexao = ?, latencia_ms = ?, ultimo_teste = NOW()
+                     WHERE id = ? AND user_id = ?"
+                )->execute([$statusConexao, $latencia, $providerId, $this->userId]);
+            } catch (\Throwable $e) {
+                // Não bloqueia a resposta se falhar
+            }
+        }
+
         $this->json($result);
     }
 
@@ -161,8 +180,8 @@ class ProviderWizardController extends Controller
             $this->db->prepare($sql)->execute($params);
         } else {
             $stmt = $this->db->prepare(
-                "INSERT INTO cop_ai_providers (user_id,nome,provider_type,api_key_enc,api_key_mask,endpoint,deployment,api_version,regiao,organizacao,conta,modo,is_default,temperatura,max_tokens,timeout_s,retry,top_p,freq_penalty,pres_penalty,idioma,wizard_step,wizard_completo)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)"
+                "INSERT INTO cop_ai_providers (user_id,nome,provider_type,api_key_enc,api_key_mask,endpoint,deployment,api_version,regiao,organizacao,conta,modo,is_default,temperatura,max_tokens,timeout_s,retry,top_p,freq_penalty,pres_penalty,idioma,wizard_step,wizard_completo,status_conexao)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'pendente')"
             );
             $stmt->execute([
                 $this->userId,$nome,$type,$apiKeyEnc,$apiKeyMask,

@@ -1030,6 +1030,7 @@ async function runValidation() {
 
   try {
     const payload = {
+      provider_id:   WIZ.editingId            || null,
       provider_type: WIZ.selectedType,
       api_key:       WIZ.credData.api_key     || '',
       endpoint:      WIZ.credData.endpoint    || '',

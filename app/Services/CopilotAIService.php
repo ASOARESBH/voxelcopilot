@@ -107,22 +107,49 @@ class CopilotAIService {
 
     /**
      * Descriptografa a API Key salva pelo ProviderWizardController (AES-256-CBC)
+     *
+     * O ProviderWizardController usa:
+     *   $iv  = openssl_random_pseudo_bytes(16);          // IV em bytes brutos (16 bytes)
+     *   $enc = openssl_encrypt($text, 'AES-256-CBC', $key, 0, $iv);  // flag=0: retorna base64
+     *   return base64_encode($iv . $enc);                // salva: base64( IV_raw + cipher_base64 )
+     *
+     * Portanto para descriptografar:
+     *   1. Decodifica o outer base64 => obtém IV_raw(16) + cipher_base64(restante)
+     *   2. Descriptografa com flag=0 (openssl espera input em base64)
      */
     private function decrypt(string $encrypted): string {
         try {
-            $key    = $_ENV['APP_KEY'] ?? 'voxel-copilot-key-2024';
-            $data   = base64_decode($encrypted);
-            if (strlen($data) <= 16) return '';
-            $iv     = substr($data, 0, 16);
-            $cipher = substr($data, 16);
-            $result = openssl_decrypt(
-                $cipher,
-                'AES-256-CBC',
-                hash('sha256', $key, true),
-                OPENSSL_RAW_DATA,
-                $iv
-            );
-            return $result !== false ? $result : '';
+            // Mesma lógica do ProviderWizardController: $_ENV primeiro, depois constante, depois fallback
+            $appKey = $_ENV['APP_KEY'] ?? (defined('APP_KEY') ? APP_KEY : 'voxelcopilot_aes_key_2026');
+            $encKey = hash('sha256', $appKey, true);
+
+            // Decodifica o outer base64
+            $data = base64_decode($encrypted);
+            if (strlen($data) <= 16) {
+                Logger::error('CopilotAI decrypt: dado muito curto', ['len' => strlen($data)]);
+                return '';
+            }
+
+            // Os primeiros 16 bytes são o IV (raw bytes)
+            $iv = substr($data, 0, 16);
+
+            // O restante é o cipher em base64 (gerado por openssl_encrypt com flag=0)
+            $cipherBase64 = substr($data, 16);
+
+            // Descriptografa com flag=0 (mesmo flag usado no encrypt)
+            $result = openssl_decrypt($cipherBase64, 'AES-256-CBC', $encKey, 0, $iv);
+
+            if ($result === false) {
+                Logger::error('CopilotAI decrypt falhou (openssl_decrypt retornou false)', [
+                    'encrypted_len'  => strlen($encrypted),
+                    'data_len'       => strlen($data),
+                    'cipher_b64_len' => strlen($cipherBase64),
+                    'app_key_src'    => defined('APP_KEY') ? 'APP_KEY_const' : 'env_fallback',
+                    'app_key_hash'   => substr(bin2hex($encKey), 0, 8) . '...',
+                ]);
+                return '';
+            }
+            return $result;
         } catch (\Throwable $e) {
             Logger::error('CopilotAI decrypt error', ['error' => $e->getMessage()]);
             return '';
