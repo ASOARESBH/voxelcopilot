@@ -806,6 +806,7 @@ async function testConnection() {
       endpoint:      WIZ.credData.endpoint      || '',
       deployment:    WIZ.credData.deployment    || '',
       api_version:   WIZ.credData.api_version   || '',
+      provider_id:   WIZ.editingId              || 0,
     };
 
     const res = await fetch('/api/ai/provider/test', {
@@ -858,6 +859,7 @@ async function discoverModels() {
       endpoint:      WIZ.credData.endpoint      || '',
       deployment:    WIZ.credData.deployment    || '',
       api_version:   WIZ.credData.api_version   || '',
+      provider_id:   WIZ.editingId              || 0,
     };
 
     const res = await fetch('/api/ai/provider/discover-models', {

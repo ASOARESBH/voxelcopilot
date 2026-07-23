@@ -49,16 +49,29 @@ class ProviderWizardController extends Controller
     // ─── API: POST /api/ai/provider/test ─────────────────────
     public function apiTest(): void
     {
-        $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        $data       = json_decode(file_get_contents('php://input'), true) ?? [];
+        $providerId = isset($data['provider_id']) ? (int)$data['provider_id'] : 0;
+        $apiKey     = trim($data['api_key'] ?? '');
+
+        // Se o campo API Key está em branco e existe um provider_id,
+        // busca e descriptografa a chave já salva no banco
+        if ($apiKey === '' && $providerId) {
+            $apiKey = $this->resolveApiKeyFromDb($providerId);
+        }
+
+        if ($apiKey === '') {
+            $this->json(['ok' => false, 'error' => 'API Key não informada. Insira a chave ou selecione um provider existente.']);
+            return;
+        }
 
         $result = $this->testConnection(
             $data['provider_type'] ?? '',
-            $data['api_key']       ?? '',
+            $apiKey,
             $data['endpoint']      ?? '',
             $data['deployment']    ?? '',
             $data['api_version']   ?? ''
         );
-        $this->logAction(null, 'test', $result['ok'] ? 'ok' : 'erro',
+        $this->logAction($providerId ?: null, 'test', $result['ok'] ? 'ok' : 'erro',
             $result['ok'] ? 'Conexao testada' : ($result['error'] ?? 'Erro'));
 
         $this->json($result);
@@ -67,10 +80,19 @@ class ProviderWizardController extends Controller
     // ─── API: POST /api/ai/provider/discover-models ──────────
     public function apiDiscoverModels(): void
     {
-        $data   = json_decode(file_get_contents('php://input'), true) ?? [];
+        $data       = json_decode(file_get_contents('php://input'), true) ?? [];
+        $providerId = isset($data['provider_id']) ? (int)$data['provider_id'] : 0;
+        $apiKey     = trim($data['api_key'] ?? '');
+
+        // Se o campo API Key está em branco e existe um provider_id,
+        // busca e descriptografa a chave já salva no banco
+        if ($apiKey === '' && $providerId) {
+            $apiKey = $this->resolveApiKeyFromDb($providerId);
+        }
+
         $models = $this->discoverModels(
             $data['provider_type'] ?? '',
-            $data['api_key']       ?? '',
+            $apiKey,
             $data['endpoint']      ?? '',
             $data['deployment']    ?? '',
             $data['api_version']   ?? ''
@@ -81,10 +103,24 @@ class ProviderWizardController extends Controller
     // ─── API: POST /api/ai/provider/validate ─────────────────
     public function apiValidate(): void
     {
-        $data   = json_decode(file_get_contents('php://input'), true) ?? [];
+        $data       = json_decode(file_get_contents('php://input'), true) ?? [];
+        $providerId = isset($data['provider_id']) ? (int)$data['provider_id'] : 0;
+        $apiKey     = trim($data['api_key'] ?? '');
+
+        // Se o campo API Key está em branco e existe um provider_id,
+        // busca e descriptografa a chave já salva no banco
+        if ($apiKey === '' && $providerId) {
+            $apiKey = $this->resolveApiKeyFromDb($providerId);
+        }
+
+        if ($apiKey === '') {
+            $this->json(['ok' => false, 'error' => 'API Key não informada. Insira a chave ou selecione um provider existente.']);
+            return;
+        }
+
         $result = $this->runFullValidation(
             $data['provider_type'] ?? '',
-            $data['api_key']       ?? '',
+            $apiKey,
             $data['endpoint']      ?? '',
             $data['model_id']      ?? '',
             $data['deployment']    ?? '',
@@ -108,6 +144,25 @@ class ProviderWizardController extends Controller
         }
 
         $this->json($result);
+    }
+
+    // ─── HELPER: Resolve API Key do banco (modo edição) ─────
+    private function resolveApiKeyFromDb(int $providerId): string
+    {
+        try {
+            $stmt = $this->db->prepare(
+                "SELECT api_key_enc FROM cop_ai_providers WHERE id = ? AND user_id = ? LIMIT 1"
+            );
+            $stmt->execute([$providerId, $this->userId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row && !empty($row['api_key_enc'])) {
+                $decrypted = $this->decrypt($row['api_key_enc']);
+                return $decrypted ?: '';
+            }
+        } catch (\Throwable $e) {
+            // Silencioso — retorna string vazia se falhar
+        }
+        return '';
     }
 
     // ─── API: GET /api/ai/provider/models ────────────────────
@@ -1036,6 +1091,21 @@ class ProviderWizardController extends Controller
         $iv  = openssl_random_pseudo_bytes(16);
         $enc = openssl_encrypt($text,'AES-256-CBC',$this->encKey,0,$iv);
         return base64_encode($iv.$enc);
+    }
+
+    private function decrypt(string $ciphertext): string
+    {
+        // Decodifica o outer base64 (formato: base64(iv_bytes + base64_cipher_string))
+        $decoded = base64_decode($ciphertext, true);
+        if ($decoded === false || strlen($decoded) < 17) return '';
+
+        // Os primeiros 16 bytes são o IV em bytes brutos
+        $iv      = substr($decoded, 0, 16);
+        // O restante é a string base64 do cipher (flag=0 no encrypt)
+        $encPart = substr($decoded, 16);
+
+        $plain = openssl_decrypt($encPart, 'AES-256-CBC', $this->encKey, 0, $iv);
+        return $plain !== false ? $plain : '';
     }
 
     private function maskApiKey(string $key): string
