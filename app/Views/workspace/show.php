@@ -1,11 +1,11 @@
 <?php
-$extraCss = ['/assets/css/workspace.css?v=3.0.0'];
+$extraCss = ['/assets/css/workspace.css?v=3.1.0'];
 $isRadiologista = !empty($layoutRadiologista);
 
 // Cabeçalho e assinatura via ReportEngineService
-$cabecalho = $reportCabecalho ?? [];
-$assinatura = $reportAssinatura ?? [];
-$qualityAlertas = $qualityAlertas ?? [];
+$cabecalho      = $reportCabecalho  ?? [];
+$assinatura     = $reportAssinatura ?? [];
+$qualityAlertas = $qualityAlertas   ?? [];
 ?>
 
 <!-- ── WORKSPACE TOPBAR ── -->
@@ -97,8 +97,8 @@ $qualityAlertas = $qualityAlertas ?? [];
 
         <!-- Revisar Laudo (Report Engine) -->
         <?php if ($laudo->status === 'rascunho'): ?>
-        <button class="ws-btn ws-btn-review" id="btn-revisar" onclick="revisarLaudo()" title="Revisão completa por IA: ortografia, terminologia, consistência, lateralidade">
-            <i class="fa-solid fa-spell-check"></i> Revisar Laudo
+        <button class="ws-btn ws-btn-review" id="btn-revisar" onclick="revisarLaudo()" title="Revisão completa por IA">
+            <i class="fa-solid fa-spell-check"></i> Revisar
         </button>
         <?php endif; ?>
 
@@ -129,14 +129,14 @@ $qualityAlertas = $qualityAlertas ?? [];
             <i class="fa-solid fa-shield-halved"></i>
             <strong>Quality Engine</strong> —
             <?php
-            $erros   = array_filter($qualityAlertas, fn($a) => $a['tipo'] === 'erro');
-            $avisos  = array_filter($qualityAlertas, fn($a) => $a['tipo'] === 'aviso');
-            $infos   = array_filter($qualityAlertas, fn($a) => $a['tipo'] === 'info');
-            $total   = count($qualityAlertas);
+            $erros  = array_filter($qualityAlertas, fn($a) => $a['tipo'] === 'erro');
+            $avisos = array_filter($qualityAlertas, fn($a) => $a['tipo'] === 'aviso');
+            $infos  = array_filter($qualityAlertas, fn($a) => $a['tipo'] === 'info');
+            $total  = count($qualityAlertas);
             echo "{$total} " . ($total === 1 ? 'alerta' : 'alertas');
-            if ($erros)  echo ' · <span class="qe-badge qe-erro">' . count($erros)  . ' erro'  . (count($erros)  > 1 ? 's' : '') . '</span>';
+            if ($erros)  echo ' · <span class="qe-badge qe-erro">'  . count($erros)  . ' erro'  . (count($erros)  > 1 ? 's' : '') . '</span>';
             if ($avisos) echo ' · <span class="qe-badge qe-aviso">' . count($avisos) . ' aviso' . (count($avisos) > 1 ? 's' : '') . '</span>';
-            if ($infos)  echo ' · <span class="qe-badge qe-info">' . count($infos)  . ' info'  . (count($infos)  > 1 ? 's' : '') . '</span>';
+            if ($infos)  echo ' · <span class="qe-badge qe-info">'  . count($infos)  . ' info'  . (count($infos)  > 1 ? 's' : '') . '</span>';
             ?>
         </span>
         <i class="fa-solid fa-chevron-down" id="qe-chevron"></i>
@@ -165,218 +165,155 @@ $qualityAlertas = $qualityAlertas ?? [];
     <!-- ── EDITOR ── -->
     <div class="ws-editor">
 
+<?php if ($isRadiologista): ?>
         <!-- ═══════════════════════════════════════════════════════════
-             BLOCO 1: CABEÇALHO (gerado automaticamente, não editável)
+             MODO RADIOLOGISTA — Layout otimizado
+             Achados e Impressão em destaque máximo.
+             Indicação, Técnica e Recomendações como painéis colapsáveis.
+             Cabeçalho e Identificação omitidos da tela (usados apenas na impressão).
              ═══════════════════════════════════════════════════════════ -->
-        <div class="ws-section-card ws-section-cabecalho">
-            <div class="ws-section-header">
-                <div class="ws-section-title">
-                    <i class="fa-solid fa-building-columns"></i>
-                    Cabeçalho
-                </div>
-                <span class="ws-section-badge ws-badge-auto">
-                    <i class="fa-solid fa-lock"></i> Gerado automaticamente
-                </span>
-            </div>
-            <div class="ws-cabecalho-grid">
+
+        <!-- Cabeçalho oculto na tela, visível apenas na impressão -->
+        <div class="ws-print-only">
+            <div class="ws-cabecalho-print">
                 <div class="ws-cabecalho-inst">
                     <?php if (!empty($cabecalho['logo_url'])): ?>
                     <img src="<?= htmlspecialchars($cabecalho['logo_url']) ?>" alt="Logo" class="ws-cabecalho-logo">
                     <?php else: ?>
-                    <div class="ws-cabecalho-logo-placeholder">
-                        <i class="fa-solid fa-hospital"></i>
-                    </div>
+                    <div class="ws-cabecalho-logo-placeholder"><i class="fa-solid fa-hospital"></i></div>
                     <?php endif; ?>
-                    <div class="ws-cabecalho-inst-info">
+                    <div>
                         <strong><?= htmlspecialchars($cabecalho['instituicao'] ?? 'VOXEL Copilot') ?></strong>
                         <?php if (!empty($cabecalho['endereco'])): ?>
                         <span><?= htmlspecialchars($cabecalho['endereco']) ?></span>
                         <?php endif; ?>
-                        <?php if (!empty($cabecalho['telefone'])): ?>
-                        <span><i class="fa-solid fa-phone"></i> <?= htmlspecialchars($cabecalho['telefone']) ?></span>
-                        <?php endif; ?>
-                        <?php if (!empty($cabecalho['cnpj'])): ?>
-                        <span>CNPJ: <?= htmlspecialchars($cabecalho['cnpj']) ?></span>
-                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="ws-cabecalho-meta">
-                    <div class="ws-cabecalho-meta-row">
-                        <span class="ws-cabecalho-label">Nº do Exame</span>
-                        <span class="ws-cabecalho-value"><?= htmlspecialchars($cabecalho['numero_exame'] ?? '—') ?></span>
-                    </div>
-                    <div class="ws-cabecalho-meta-row">
-                        <span class="ws-cabecalho-label">Código Interno</span>
-                        <span class="ws-cabecalho-value"><?= htmlspecialchars($cabecalho['codigo_interno'] ?? '—') ?></span>
-                    </div>
-                    <?php if (!empty($cabecalho['codigo_tiss'])): ?>
-                    <div class="ws-cabecalho-meta-row">
-                        <span class="ws-cabecalho-label">Código TISS</span>
-                        <span class="ws-cabecalho-value"><?= htmlspecialchars($cabecalho['codigo_tiss']) ?></span>
-                    </div>
+                    <div><strong>Paciente:</strong> <?= htmlspecialchars($laudo->patient_nome ?? '—') ?></div>
+                    <?php if (!empty($laudo->patient_sexo)): ?>
+                    <div><strong>Sexo:</strong> <?= $laudo->patient_sexo === 'M' ? 'Masculino' : 'Feminino' ?></div>
                     <?php endif; ?>
-                    <div class="ws-cabecalho-meta-row">
-                        <span class="ws-cabecalho-label">Data</span>
-                        <span class="ws-cabecalho-value"><?= htmlspecialchars($cabecalho['data_exame'] ?? date('d/m/Y')) ?></span>
-                    </div>
-                    <div class="ws-cabecalho-meta-row">
-                        <span class="ws-cabecalho-label">Hora</span>
-                        <span class="ws-cabecalho-value"><?= htmlspecialchars($cabecalho['hora_exame'] ?? date('H:i')) ?></span>
-                    </div>
-                    <?php if (!empty($cabecalho['modalidade'])): ?>
-                    <div class="ws-cabecalho-meta-row">
-                        <span class="ws-cabecalho-label">Modalidade</span>
-                        <span class="ws-cabecalho-value"><?= htmlspecialchars($cabecalho['modalidade']) ?></span>
-                    </div>
+                    <?php if (!empty($laudo->patient_idade)): ?>
+                    <div><strong>Idade:</strong> <?= htmlspecialchars($laudo->patient_idade) ?> anos</div>
+                    <?php endif; ?>
+                    <div><strong>Modalidade:</strong> <?= htmlspecialchars($laudo->modalidade ?? '—') ?></div>
+                    <div><strong>Data:</strong> <?= date('d/m/Y', strtotime($laudo->created_at)) ?></div>
+                    <?php if (!empty($laudo->study_uid)): ?>
+                    <div><strong>Study UID:</strong> <?= htmlspecialchars($laudo->study_uid) ?></div>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
 
-        <!-- ═══════════════════════════════════════════════════════════
-             BLOCO 2: IDENTIFICAÇÃO (importado do RIS/PACS, não editável)
-             ═══════════════════════════════════════════════════════════ -->
-        <div class="ws-section-card ws-section-identificacao">
-            <div class="ws-section-header">
-                <div class="ws-section-title">
-                    <i class="fa-solid fa-id-card"></i>
-                    Identificação
-                </div>
-                <span class="ws-section-badge ws-badge-auto">
-                    <i class="fa-solid fa-database"></i> RIS/PACS
-                </span>
-            </div>
-            <div class="ws-identificacao-grid">
-                <div class="ws-id-row">
-                    <span class="ws-id-label">Paciente</span>
-                    <span class="ws-id-value ws-id-destaque"><?= htmlspecialchars($laudo->patient_nome ?? 'Não identificado') ?></span>
-                </div>
-                <?php if (!empty($laudo->patient_sexo)): ?>
-                <div class="ws-id-row">
-                    <span class="ws-id-label">Sexo</span>
-                    <span class="ws-id-value"><?= $laudo->patient_sexo === 'M' ? 'Masculino' : ($laudo->patient_sexo === 'F' ? 'Feminino' : htmlspecialchars($laudo->patient_sexo)) ?></span>
-                </div>
-                <?php endif; ?>
-                <?php if (!empty($laudo->patient_idade)): ?>
-                <div class="ws-id-row">
-                    <span class="ws-id-label">Idade</span>
-                    <span class="ws-id-value"><?= htmlspecialchars($laudo->patient_idade) ?> anos</span>
-                </div>
-                <?php endif; ?>
-                <?php if (!empty($laudo->patient_nascimento)): ?>
-                <div class="ws-id-row">
-                    <span class="ws-id-label">Nascimento</span>
-                    <span class="ws-id-value"><?= date('d/m/Y', strtotime($laudo->patient_nascimento)) ?></span>
-                </div>
-                <?php endif; ?>
-                <?php if (!empty($laudo->patient_uid)): ?>
-                <div class="ws-id-row">
-                    <span class="ws-id-label">Prontuário</span>
-                    <span class="ws-id-value" style="font-family:monospace;font-size:11px;"><?= htmlspecialchars($laudo->patient_uid) ?></span>
-                </div>
-                <?php endif; ?>
-                <?php if (!empty($laudo->convenio)): ?>
-                <div class="ws-id-row">
-                    <span class="ws-id-label">Convênio</span>
-                    <span class="ws-id-value"><?= htmlspecialchars($laudo->convenio) ?></span>
-                </div>
-                <?php endif; ?>
-                <?php if (!empty($laudo->medico_solicitante)): ?>
-                <div class="ws-id-row">
-                    <span class="ws-id-label">Solicitante</span>
-                    <span class="ws-id-value"><?= htmlspecialchars($laudo->medico_solicitante) ?></span>
-                </div>
-                <?php endif; ?>
-                <div class="ws-id-row">
-                    <span class="ws-id-label">Data do Exame</span>
-                    <span class="ws-id-value"><?= date('d/m/Y', strtotime($laudo->created_at)) ?></span>
-                </div>
-                <div class="ws-id-row">
-                    <span class="ws-id-label">Data do Laudo</span>
-                    <span class="ws-id-value"><?= $laudo->assinado_em ? date('d/m/Y', strtotime($laudo->assinado_em)) : '<em style="color:var(--muted)">Pendente assinatura</em>' ?></span>
-                </div>
-                <?php if (!empty($laudo->study_uid)): ?>
-                <div class="ws-id-row">
-                    <span class="ws-id-label">Study UID</span>
-                    <span class="ws-id-value" style="font-family:monospace;font-size:10px;word-break:break-all;"><?= htmlspecialchars($laudo->study_uid) ?></span>
-                </div>
-                <?php endif; ?>
-                <?php if (!empty($laudo->accession_number)): ?>
-                <div class="ws-id-row">
-                    <span class="ws-id-label">Accession</span>
-                    <span class="ws-id-value" style="font-family:monospace;"><?= htmlspecialchars($laudo->accession_number) ?></span>
-                </div>
-                <?php endif; ?>
-            </div>
-        </div>
+        <!-- ── PAINÉIS COLAPSÁVEIS: Indicação, Técnica, Recomendações ── -->
+        <div class="ws-collapse-group">
 
-        <!-- ═══════════════════════════════════════════════════════════
-             BLOCO 3: INDICAÇÃO CLÍNICA (nunca deixar vazia)
-             ═══════════════════════════════════════════════════════════ -->
-        <div class="ws-section-card <?= empty($laudo->indicacao) ? 'ws-section-alerta' : '' ?>" id="card-indicacao">
-            <div class="ws-section-header">
-                <div class="ws-section-title">
-                    <i class="fa-solid fa-clipboard-question"></i>
-                    Indicação Clínica
-                    <?php if (empty($laudo->indicacao)): ?>
-                    <span class="ws-section-obrigatorio" title="Indicação clínica é obrigatória">
-                        <i class="fa-solid fa-triangle-exclamation"></i> Obrigatória
-                    </span>
-                    <?php endif; ?>
+            <!-- Indicação Clínica (colapsável) -->
+            <div class="ws-collapse-card <?= empty($laudo->indicacao) ? 'ws-collapse-alerta' : '' ?>" id="collapse-indicacao">
+                <div class="ws-collapse-header" onclick="toggleCollapse('indicacao')">
+                    <div class="ws-collapse-title">
+                        <i class="fa-solid fa-clipboard-question"></i>
+                        Indicação Clínica
+                        <?php if (empty($laudo->indicacao)): ?>
+                        <span class="ws-collapse-badge ws-collapse-badge-warn">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Vazia
+                        </span>
+                        <?php else: ?>
+                        <span class="ws-collapse-preview" id="preview-indicacao">
+                            <?= htmlspecialchars(substr($laudo->indicacao ?? '', 0, 60)) ?><?= strlen($laudo->indicacao ?? '') > 60 ? '…' : '' ?>
+                        </span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="ws-collapse-right">
+                        <?php if ($laudo->status === 'rascunho'): ?>
+                        <button class="ws-btn ws-btn-ghost ws-btn-xs" onclick="event.stopPropagation();sugerirIndicacao()" title="Sugerir com IA">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        </button>
+                        <?php endif; ?>
+                        <i class="fa-solid fa-chevron-down ws-collapse-chevron" id="chevron-indicacao"></i>
+                    </div>
                 </div>
-                <?php if ($laudo->status === 'rascunho'): ?>
-                <div class="ws-section-actions">
-                    <button class="ws-btn ws-btn-ghost ws-btn-xs" onclick="sugerirIndicacao()" title="Sugerir indicação clínica com IA">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Sugerir
-                    </button>
+                <div class="ws-collapse-body" id="body-indicacao" style="display:none;">
+                    <textarea class="ws-textarea" id="indicacao" name="indicacao"
+                        placeholder="Informe a indicação clínica do exame."
+                        style="min-height:72px;"
+                        <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
+                    ><?= htmlspecialchars($laudo->indicacao ?? '') ?></textarea>
                 </div>
-                <?php endif; ?>
             </div>
-            <div class="ws-section-body">
-                <textarea class="ws-textarea" id="indicacao" name="indicacao"
-                    placeholder="Informe a indicação clínica do exame. Ex: Dor abdominal. Controle oncológico. Investigação de metástases."
-                    style="min-height:64px;"
-                    <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
-                ><?= htmlspecialchars($laudo->indicacao ?? '') ?></textarea>
-            </div>
-        </div>
 
-        <!-- ═══════════════════════════════════════════════════════════
-             BLOCO 4: TÉCNICA (gerada automaticamente por modalidade)
-             ═══════════════════════════════════════════════════════════ -->
-        <div class="ws-section-card" id="card-tecnica">
-            <div class="ws-section-header">
-                <div class="ws-section-title">
-                    <i class="fa-solid fa-gears"></i>
-                    Técnica
+            <!-- Técnica (colapsável) -->
+            <div class="ws-collapse-card" id="collapse-tecnica">
+                <div class="ws-collapse-header" onclick="toggleCollapse('tecnica')">
+                    <div class="ws-collapse-title">
+                        <i class="fa-solid fa-gears"></i>
+                        Técnica
+                        <?php if (!empty($laudo->tecnica)): ?>
+                        <span class="ws-collapse-preview" id="preview-tecnica">
+                            <?= htmlspecialchars(substr($laudo->tecnica ?? '', 0, 60)) ?><?= strlen($laudo->tecnica ?? '') > 60 ? '…' : '' ?>
+                        </span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="ws-collapse-right">
+                        <?php if ($laudo->status === 'rascunho'): ?>
+                        <button class="ws-btn ws-btn-ghost ws-btn-xs" onclick="event.stopPropagation();gerarTecnicaAuto()" title="Gerar técnica automática">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Auto
+                        </button>
+                        <?php endif; ?>
+                        <i class="fa-solid fa-chevron-down ws-collapse-chevron" id="chevron-tecnica"></i>
+                    </div>
                 </div>
-                <?php if ($laudo->status === 'rascunho'): ?>
-                <div class="ws-section-actions">
-                    <button class="ws-btn ws-btn-ghost ws-btn-xs" onclick="gerarTecnicaAuto()" title="Gerar técnica padrão para a modalidade">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Auto
-                    </button>
+                <div class="ws-collapse-body" id="body-tecnica" style="display:none;">
+                    <textarea class="ws-textarea" id="tecnica" name="tecnica"
+                        placeholder="Descreva a técnica utilizada ou clique em 'Auto' para gerar automaticamente."
+                        style="min-height:80px;"
+                        <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
+                    ><?= htmlspecialchars($laudo->tecnica ?? '') ?></textarea>
                 </div>
-                <?php endif; ?>
             </div>
-            <div class="ws-section-body">
-                <textarea class="ws-textarea" id="tecnica" name="tecnica"
-                    placeholder="Descreva a técnica utilizada. Use 'Gerar Auto' para preencher automaticamente com base na modalidade."
-                    style="min-height:80px;"
-                    <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
-                ><?= htmlspecialchars($laudo->tecnica ?? '') ?></textarea>
-            </div>
-        </div>
 
-        <!-- ═══════════════════════════════════════════════════════════
-             BLOCO 5: ACHADOS (descrição objetiva — nunca interpretação)
-             ═══════════════════════════════════════════════════════════ -->
-        <div class="ws-section-card ws-section-achados" id="card-achados">
+            <!-- Recomendações (colapsável) -->
+            <div class="ws-collapse-card" id="collapse-recomendacao">
+                <div class="ws-collapse-header" onclick="toggleCollapse('recomendacao')">
+                    <div class="ws-collapse-title">
+                        <i class="fa-solid fa-notes-medical"></i>
+                        Recomendações
+                        <span class="ws-collapse-badge ws-collapse-badge-opt">opcional</span>
+                        <?php if (!empty($laudo->recomendacao)): ?>
+                        <span class="ws-collapse-preview" id="preview-recomendacao">
+                            <?= htmlspecialchars(substr($laudo->recomendacao ?? '', 0, 60)) ?><?= strlen($laudo->recomendacao ?? '') > 60 ? '…' : '' ?>
+                        </span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="ws-collapse-right">
+                        <?php if ($laudo->status === 'rascunho'): ?>
+                        <button class="ws-btn ws-btn-ghost ws-btn-xs" onclick="event.stopPropagation();sendQuick('Sugira recomendações baseadas nos achados e impressão diagnóstica, incluindo protocolos aplicáveis (Lung-RADS, BI-RADS, PI-RADS, LI-RADS, Fleischner, Bosniak, ACR)')" title="Sugerir com IA">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        </button>
+                        <?php endif; ?>
+                        <i class="fa-solid fa-chevron-down ws-collapse-chevron" id="chevron-recomendacao"></i>
+                    </div>
+                </div>
+                <div class="ws-collapse-body" id="body-recomendacao" style="display:none;">
+                    <textarea class="ws-textarea" id="recomendacao" name="recomendacao"
+                        placeholder="Recomendações para o clínico solicitante. Gerado quando há protocolos aplicáveis."
+                        style="min-height:80px;"
+                        <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
+                    ><?= htmlspecialchars($laudo->recomendacao ?? '') ?></textarea>
+                </div>
+            </div>
+
+        </div><!-- /.ws-collapse-group -->
+
+        <!-- ── ACHADOS — Destaque máximo ── -->
+        <div class="ws-section-card ws-section-achados ws-section-destaque" id="card-achados">
             <div class="ws-section-header">
                 <div class="ws-section-title">
                     <i class="fa-solid fa-magnifying-glass"></i>
                     Achados
                     <span class="ws-section-regra" title="Apenas descrição objetiva. Nunca diagnóstico ou interpretação.">
-                        <i class="fa-solid fa-circle-info"></i> Apenas descrição objetiva
+                        <i class="fa-solid fa-circle-info"></i> Descrição objetiva
                     </span>
                 </div>
                 <?php if ($laudo->status === 'rascunho'): ?>
@@ -406,18 +343,16 @@ $qualityAlertas = $qualityAlertas ?? [];
             </div>
             <?php endif; ?>
             <div class="ws-section-body">
-                <textarea class="ws-textarea" id="achados" name="achados"
-                    placeholder="Descreva os achados objetivamente, por sistemas/órgãos. Não use: provável, compatível, sugere, indica, pode representar, favorece. Essas expressões pertencem à Impressão Diagnóstica."
-                    style="min-height:<?= $isRadiologista ? '340px' : '200px' ?>;"
+                <textarea class="ws-textarea ws-textarea-destaque" id="achados" name="achados"
+                    placeholder="Descreva os achados objetivamente, por sistemas/órgãos. Não use: provável, compatível, sugere, indica, pode representar, favorece."
+                    style="min-height:380px;"
                     <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
                 ><?= htmlspecialchars($laudo->achados ?? '') ?></textarea>
             </div>
         </div>
 
-        <!-- ═══════════════════════════════════════════════════════════
-             BLOCO 6: IMPRESSÃO DIAGNÓSTICA (somente interpretação)
-             ═══════════════════════════════════════════════════════════ -->
-        <div class="ws-section-card ws-section-impressao" id="card-impressao">
+        <!-- ── IMPRESSÃO DIAGNÓSTICA — Destaque máximo ── -->
+        <div class="ws-section-card ws-section-impressao ws-section-destaque" id="card-impressao">
             <div class="ws-section-header">
                 <div class="ws-section-title">
                     <i class="fa-solid fa-lightbulb"></i>
@@ -435,17 +370,237 @@ $qualityAlertas = $qualityAlertas ?? [];
                 <?php endif; ?>
             </div>
             <div class="ws-section-body">
+                <textarea class="ws-textarea ws-textarea-destaque" id="impressao" name="impressao"
+                    placeholder="• Interpretação clínica em tópicos&#10;• Resumo objetivo dos achados mais relevantes&#10;• Correlação com a indicação clínica"
+                    style="min-height:200px;"
+                    <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
+                ><?= htmlspecialchars($laudo->impressao ?? '') ?></textarea>
+            </div>
+        </div>
+
+<?php else: ?>
+        <!-- ═══════════════════════════════════════════════════════════
+             MODO PADRÃO (não-radiologista) — Layout completo com todos os blocos
+             ═══════════════════════════════════════════════════════════ -->
+
+        <!-- BLOCO 1: CABEÇALHO -->
+        <div class="ws-section-card ws-section-cabecalho">
+            <div class="ws-section-header">
+                <div class="ws-section-title">
+                    <i class="fa-solid fa-building-columns"></i>
+                    Cabeçalho
+                </div>
+                <span class="ws-section-badge ws-badge-auto">
+                    <i class="fa-solid fa-lock"></i> Gerado automaticamente
+                </span>
+            </div>
+            <div class="ws-cabecalho-grid">
+                <div class="ws-cabecalho-inst">
+                    <?php if (!empty($cabecalho['logo_url'])): ?>
+                    <img src="<?= htmlspecialchars($cabecalho['logo_url']) ?>" alt="Logo" class="ws-cabecalho-logo">
+                    <?php else: ?>
+                    <div class="ws-cabecalho-logo-placeholder"><i class="fa-solid fa-hospital"></i></div>
+                    <?php endif; ?>
+                    <div class="ws-cabecalho-inst-info">
+                        <strong><?= htmlspecialchars($cabecalho['instituicao'] ?? 'VOXEL Copilot') ?></strong>
+                        <?php if (!empty($cabecalho['endereco'])): ?>
+                        <span><?= htmlspecialchars($cabecalho['endereco']) ?></span>
+                        <?php endif; ?>
+                        <?php if (!empty($cabecalho['telefone'])): ?>
+                        <span><i class="fa-solid fa-phone"></i> <?= htmlspecialchars($cabecalho['telefone']) ?></span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="ws-cabecalho-meta">
+                    <div class="ws-cabecalho-meta-row">
+                        <span class="ws-cabecalho-label">Nº do Exame</span>
+                        <span class="ws-cabecalho-value"><?= htmlspecialchars($cabecalho['numero_exame'] ?? '—') ?></span>
+                    </div>
+                    <div class="ws-cabecalho-meta-row">
+                        <span class="ws-cabecalho-label">Data</span>
+                        <span class="ws-cabecalho-value"><?= htmlspecialchars($cabecalho['data_exame'] ?? date('d/m/Y')) ?></span>
+                    </div>
+                    <div class="ws-cabecalho-meta-row">
+                        <span class="ws-cabecalho-label">Hora</span>
+                        <span class="ws-cabecalho-value"><?= htmlspecialchars($cabecalho['hora_exame'] ?? date('H:i')) ?></span>
+                    </div>
+                    <?php if (!empty($cabecalho['modalidade'])): ?>
+                    <div class="ws-cabecalho-meta-row">
+                        <span class="ws-cabecalho-label">Modalidade</span>
+                        <span class="ws-cabecalho-value"><?= htmlspecialchars($cabecalho['modalidade']) ?></span>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- BLOCO 2: IDENTIFICAÇÃO -->
+        <div class="ws-section-card ws-section-identificacao">
+            <div class="ws-section-header">
+                <div class="ws-section-title">
+                    <i class="fa-solid fa-id-card"></i>
+                    Identificação
+                </div>
+                <span class="ws-section-badge ws-badge-auto">
+                    <i class="fa-solid fa-database"></i> RIS/PACS
+                </span>
+            </div>
+            <div class="ws-identificacao-grid">
+                <div class="ws-id-row">
+                    <span class="ws-id-label">Paciente</span>
+                    <span class="ws-id-value ws-id-destaque"><?= htmlspecialchars($laudo->patient_nome ?? 'Não identificado') ?></span>
+                </div>
+                <?php if (!empty($laudo->patient_sexo)): ?>
+                <div class="ws-id-row">
+                    <span class="ws-id-label">Sexo</span>
+                    <span class="ws-id-value"><?= $laudo->patient_sexo === 'M' ? 'Masculino' : ($laudo->patient_sexo === 'F' ? 'Feminino' : htmlspecialchars($laudo->patient_sexo)) ?></span>
+                </div>
+                <?php endif; ?>
+                <?php if (!empty($laudo->patient_idade)): ?>
+                <div class="ws-id-row">
+                    <span class="ws-id-label">Idade</span>
+                    <span class="ws-id-value"><?= htmlspecialchars($laudo->patient_idade) ?> anos</span>
+                </div>
+                <?php endif; ?>
+                <?php if (!empty($laudo->patient_uid)): ?>
+                <div class="ws-id-row">
+                    <span class="ws-id-label">Prontuário</span>
+                    <span class="ws-id-value" style="font-family:monospace;font-size:11px;"><?= htmlspecialchars($laudo->patient_uid) ?></span>
+                </div>
+                <?php endif; ?>
+                <?php if (!empty($laudo->convenio)): ?>
+                <div class="ws-id-row">
+                    <span class="ws-id-label">Convênio</span>
+                    <span class="ws-id-value"><?= htmlspecialchars($laudo->convenio) ?></span>
+                </div>
+                <?php endif; ?>
+                <div class="ws-id-row">
+                    <span class="ws-id-label">Data do Laudo</span>
+                    <span class="ws-id-value"><?= $laudo->assinado_em ? date('d/m/Y', strtotime($laudo->assinado_em)) : '<em style="color:var(--muted)">Pendente assinatura</em>' ?></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- BLOCO 3: INDICAÇÃO CLÍNICA -->
+        <div class="ws-section-card <?= empty($laudo->indicacao) ? 'ws-section-alerta' : '' ?>" id="card-indicacao">
+            <div class="ws-section-header">
+                <div class="ws-section-title">
+                    <i class="fa-solid fa-clipboard-question"></i>
+                    Indicação Clínica
+                    <?php if (empty($laudo->indicacao)): ?>
+                    <span class="ws-section-obrigatorio"><i class="fa-solid fa-triangle-exclamation"></i> Obrigatória</span>
+                    <?php endif; ?>
+                </div>
+                <?php if ($laudo->status === 'rascunho'): ?>
+                <div class="ws-section-actions">
+                    <button class="ws-btn ws-btn-ghost ws-btn-xs" onclick="sugerirIndicacao()">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Sugerir
+                    </button>
+                </div>
+                <?php endif; ?>
+            </div>
+            <div class="ws-section-body">
+                <textarea class="ws-textarea" id="indicacao" name="indicacao"
+                    placeholder="Informe a indicação clínica do exame."
+                    style="min-height:64px;"
+                    <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
+                ><?= htmlspecialchars($laudo->indicacao ?? '') ?></textarea>
+            </div>
+        </div>
+
+        <!-- BLOCO 4: TÉCNICA -->
+        <div class="ws-section-card" id="card-tecnica">
+            <div class="ws-section-header">
+                <div class="ws-section-title">
+                    <i class="fa-solid fa-gears"></i>
+                    Técnica
+                </div>
+                <?php if ($laudo->status === 'rascunho'): ?>
+                <div class="ws-section-actions">
+                    <button class="ws-btn ws-btn-ghost ws-btn-xs" onclick="gerarTecnicaAuto()">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Auto
+                    </button>
+                </div>
+                <?php endif; ?>
+            </div>
+            <div class="ws-section-body">
+                <textarea class="ws-textarea" id="tecnica" name="tecnica"
+                    placeholder="Descreva a técnica utilizada."
+                    style="min-height:80px;"
+                    <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
+                ><?= htmlspecialchars($laudo->tecnica ?? '') ?></textarea>
+            </div>
+        </div>
+
+        <!-- BLOCO 5: ACHADOS -->
+        <div class="ws-section-card ws-section-achados" id="card-achados">
+            <div class="ws-section-header">
+                <div class="ws-section-title">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    Achados
+                    <span class="ws-section-regra"><i class="fa-solid fa-circle-info"></i> Apenas descrição objetiva</span>
+                </div>
+                <?php if ($laudo->status === 'rascunho'): ?>
+                <div class="ws-section-actions">
+                    <button class="ws-btn ws-btn-ai ws-btn-xs" onclick="gerarSugestaoIA()" id="btn-ia-achados">
+                        <i class="fa-solid fa-brain"></i> Sugerir com IA
+                    </button>
+                    <button class="ws-btn ws-btn-ghost ws-btn-xs" onclick="aplicarDicionario('achados')">
+                        <i class="fa-solid fa-book-medical"></i> Padronizar
+                    </button>
+                    <?php if (!empty($autotextos)): ?>
+                    <button class="ws-btn ws-btn-ghost ws-btn-xs" onclick="toggleAutotextos()">
+                        <i class="fa-solid fa-bolt"></i> Autotextos
+                    </button>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php if (!empty($autotextos)): ?>
+            <div class="ws-autotextos" id="autotextos-panel" style="display:none;">
+                <?php foreach ($autotextos as $at): ?>
+                <button class="ws-autotexto-btn" onclick="inserirAutotexto('achados', <?= json_encode($at->texto) ?>)">
+                    <strong><?= htmlspecialchars($at->atalho) ?></strong>
+                    <span><?= htmlspecialchars(substr($at->texto, 0, 60)) ?>...</span>
+                </button>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+            <div class="ws-section-body">
+                <textarea class="ws-textarea" id="achados" name="achados"
+                    placeholder="Descreva os achados objetivamente, por sistemas/órgãos."
+                    style="min-height:200px;"
+                    <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
+                ><?= htmlspecialchars($laudo->achados ?? '') ?></textarea>
+            </div>
+        </div>
+
+        <!-- BLOCO 6: IMPRESSÃO DIAGNÓSTICA -->
+        <div class="ws-section-card ws-section-impressao" id="card-impressao">
+            <div class="ws-section-header">
+                <div class="ws-section-title">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    Impressão Diagnóstica
+                    <span class="ws-section-regra"><i class="fa-solid fa-circle-info"></i> Somente interpretação</span>
+                </div>
+                <?php if ($laudo->status === 'rascunho'): ?>
+                <div class="ws-section-actions">
+                    <button class="ws-btn ws-btn-ai ws-btn-xs" onclick="gerarImpressaoIA()" id="btn-ia-impressao">
+                        <i class="fa-solid fa-brain"></i> Gerar com IA
+                    </button>
+                </div>
+                <?php endif; ?>
+            </div>
+            <div class="ws-section-body">
                 <textarea class="ws-textarea" id="impressao" name="impressao"
-                    placeholder="• Interpretação clínica em tópicos&#10;• Resumo objetivo dos achados mais relevantes&#10;• Correlação com a indicação clínica&#10;• Recomendações de conduta (se aplicável)"
+                    placeholder="• Interpretação clínica em tópicos&#10;• Resumo objetivo dos achados mais relevantes"
                     style="min-height:120px;"
                     <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
                 ><?= htmlspecialchars($laudo->impressao ?? '') ?></textarea>
             </div>
         </div>
 
-        <!-- ═══════════════════════════════════════════════════════════
-             BLOCO 7: RECOMENDAÇÕES + CID (opcional)
-             ═══════════════════════════════════════════════════════════ -->
+        <!-- BLOCO 7: RECOMENDAÇÕES + CID -->
         <div class="ws-row-2col">
             <div class="ws-section-card" id="card-recomendacao">
                 <div class="ws-section-header">
@@ -456,7 +611,7 @@ $qualityAlertas = $qualityAlertas ?? [];
                     </div>
                     <?php if ($laudo->status === 'rascunho'): ?>
                     <div class="ws-section-actions">
-                        <button class="ws-btn ws-btn-ghost ws-btn-xs" onclick="sendQuick('Sugira recomendações baseadas nos achados e impressão diagnóstica, incluindo protocolos aplicáveis (Lung-RADS, BI-RADS, PI-RADS, LI-RADS, Fleischner, Bosniak, ACR)')" title="Sugerir recomendações com IA">
+                        <button class="ws-btn ws-btn-ghost ws-btn-xs" onclick="sendQuick('Sugira recomendações baseadas nos achados e impressão diagnóstica, incluindo protocolos aplicáveis (Lung-RADS, BI-RADS, PI-RADS, LI-RADS, Fleischner, Bosniak, ACR)')">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Sugerir
                         </button>
                     </div>
@@ -464,7 +619,7 @@ $qualityAlertas = $qualityAlertas ?? [];
                 </div>
                 <div class="ws-section-body">
                     <textarea class="ws-textarea" id="recomendacao" name="recomendacao"
-                        placeholder="Recomendações para o clínico solicitante. Gerado quando há protocolos aplicáveis (Lung-RADS, BI-RADS, PI-RADS, LI-RADS, Fleischner, Bosniak, ACR) ou por decisão do médico."
+                        placeholder="Recomendações para o clínico solicitante."
                         style="min-height:80px;"
                         <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
                     ><?= htmlspecialchars($laudo->recomendacao ?? '') ?></textarea>
@@ -478,7 +633,7 @@ $qualityAlertas = $qualityAlertas ?? [];
                     </div>
                     <?php if ($laudo->status === 'rascunho'): ?>
                     <div class="ws-section-actions">
-                        <button class="ws-btn ws-btn-ghost ws-btn-xs" onclick="sendQuick('Sugira o CID-10 mais adequado para este caso')" title="Sugerir CID-10 com IA">
+                        <button class="ws-btn ws-btn-ghost ws-btn-xs" onclick="sendQuick('Sugira o CID-10 mais adequado para este caso')">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Sugerir
                         </button>
                     </div>
@@ -494,9 +649,9 @@ $qualityAlertas = $qualityAlertas ?? [];
             </div>
         </div>
 
-        <!-- ═══════════════════════════════════════════════════════════
-             EXAMES ANTERIORES
-             ═══════════════════════════════════════════════════════════ -->
+<?php endif; /* fim if $isRadiologista */ ?>
+
+        <!-- ── EXAMES ANTERIORES (ambos os modos) ── -->
         <?php if (!empty($examesAnteriores)): ?>
         <div class="ws-section-card ws-exames-anteriores" id="ws-exames-ant">
             <div class="ws-section-header">
@@ -548,9 +703,7 @@ $qualityAlertas = $qualityAlertas ?? [];
         </div>
         <?php endif; ?>
 
-        <!-- ═══════════════════════════════════════════════════════════
-             BLOCO 8: ASSINATURA DIGITAL (gerada automaticamente)
-             ═══════════════════════════════════════════════════════════ -->
+        <!-- ── ASSINATURA DIGITAL (ambos os modos) ── -->
         <?php if ($laudo->status === 'assinado' && !empty($assinatura)): ?>
         <div class="ws-section-card ws-section-assinatura">
             <div class="ws-section-header">
@@ -612,7 +765,7 @@ $qualityAlertas = $qualityAlertas ?? [];
             <div class="ws-study-header">
                 <i class="fa-solid fa-microscope"></i>
                 Informações do Estudo
-                <span class="ws-study-dot" style="background:<?= $laudo->status === 'assinado' ? '#059669' : '#d97706' ?>;"></span>
+                <span class="ws-study-dot" style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;margin-left:auto;"></span>
             </div>
             <div class="ws-study-rows">
                 <div class="ws-study-row">
@@ -680,9 +833,6 @@ $qualityAlertas = $qualityAlertas ?? [];
                 <button class="ws-quick-btn" onclick="sendQuick('Sugira recomendações para o médico solicitante baseadas nos achados e impressão diagnóstica')" title="Sugerir Recomendações">
                     <i class="fa-solid fa-notes-medical"></i> Recomen.
                 </button>
-                <button class="ws-quick-btn" onclick="sendQuick('Sugira o CID-10 mais adequado para este caso')" title="Sugerir CID-10">
-                    <i class="fa-solid fa-tag"></i> CID
-                </button>
                 <button class="ws-quick-btn ws-quick-btn-chat" onclick="focarChat()" title="Chat com o Copilot">
                     <i class="fa-solid fa-comments"></i> Chat
                 </button>
@@ -694,7 +844,11 @@ $qualityAlertas = $qualityAlertas ?? [];
                 <div class="ws-chat-msg ws-chat-msg-ai">
                     <div class="ws-chat-bubble">
                         <strong>Olá, Dr. <?= htmlspecialchars(explode(' ', $_SESSION['user']->name ?? 'Médico')[0]) ?>!</strong>
-                        Sou o VOXEL Copilot com <strong>Report Engine</strong>. Posso sugerir achados, gerar impressões diagnósticas, revisar o laudo completo, verificar consistências, indicar CID-10 e padronizar terminologia radiológica.
+                        <?php if ($isRadiologista): ?>
+                        Modo Radiologista ativo. Posso sugerir achados, gerar impressões diagnósticas, revisar o laudo e padronizar terminologia.
+                        <?php else: ?>
+                        Sou o VOXEL Copilot com <strong>Report Engine</strong>. Posso sugerir achados, gerar impressões diagnósticas, revisar o laudo completo e indicar CID-10.
+                        <?php endif; ?>
                     </div>
                     <div class="ws-chat-time">Agora</div>
                 </div>
@@ -736,6 +890,35 @@ const workspaceId = parseInt(document.getElementById('workspace-id').value, 10);
 const csrfToken   = document.getElementById('csrf-token').value;
 const isReadonly  = <?= $laudo->status !== 'rascunho' ? 'true' : 'false' ?>;
 const modalidade  = document.getElementById('modalidade').value;
+const isRadiologista = <?= $isRadiologista ? 'true' : 'false' ?>;
+
+// ── PAINÉIS COLAPSÁVEIS (modo Radiologista) ────────────────────
+function toggleCollapse(campo) {
+    var body    = document.getElementById('body-' + campo);
+    var chevron = document.getElementById('chevron-' + campo);
+    if (!body) return;
+    var isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    if (chevron) chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+    // Foca o textarea ao abrir
+    if (!isOpen) {
+        var ta = document.getElementById(campo);
+        if (ta) setTimeout(function() { ta.focus(); }, 80);
+    }
+}
+
+// Abre automaticamente se o campo estiver vazio (Indicação) ou preenchido (Técnica/Recomendação)
+document.addEventListener('DOMContentLoaded', function() {
+    if (!isRadiologista) return;
+    // Indicação: abre se estiver vazia para chamar atenção
+    var indicacaoVal = document.getElementById('indicacao')?.value?.trim();
+    if (!indicacaoVal) {
+        var bodyInd = document.getElementById('body-indicacao');
+        var chevInd = document.getElementById('chevron-indicacao');
+        if (bodyInd) bodyInd.style.display = 'block';
+        if (chevInd) chevInd.style.transform = 'rotate(180deg)';
+    }
+});
 
 // ── AUTO-SAVE ──────────────────────────────────────────────────
 let saveTimer = null;
@@ -822,7 +1005,7 @@ function assinarLaudo() {
 
 // ── QUALITY ENGINE — Toggle ────────────────────────────────────
 function toggleQualityBar() {
-    const list = document.getElementById('quality-list');
+    const list    = document.getElementById('quality-list');
     const chevron = document.getElementById('qe-chevron');
     if (!list) return;
     const isOpen = list.style.display !== 'none';
@@ -831,22 +1014,42 @@ function toggleQualityBar() {
 }
 
 function irParaCampo(campo) {
+    // No modo radiologista, expande o painel colapsável antes de focar
+    if (isRadiologista && ['indicacao','tecnica','recomendacao'].includes(campo)) {
+        var body = document.getElementById('body-' + campo);
+        var chevron = document.getElementById('chevron-' + campo);
+        if (body && body.style.display === 'none') {
+            body.style.display = 'block';
+            if (chevron) chevron.style.transform = 'rotate(180deg)';
+        }
+    }
     const el = document.getElementById(campo);
     if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    el.focus();
-    el.classList.add('ws-field-highlight');
-    setTimeout(function() { el.classList.remove('ws-field-highlight'); }, 2000);
+    setTimeout(function() {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus();
+        el.classList.add('ws-field-highlight');
+        setTimeout(function() { el.classList.remove('ws-field-highlight'); }, 2000);
+    }, 150);
 }
 
 // ── TÉCNICA AUTO ──────────────────────────────────────────────
 function gerarTecnicaAuto() {
     if (isReadonly) return;
+    // No modo radiologista, expande o painel de técnica
+    if (isRadiologista) {
+        var body = document.getElementById('body-tecnica');
+        var chevron = document.getElementById('chevron-tecnica');
+        if (body && body.style.display === 'none') {
+            body.style.display = 'block';
+            if (chevron) chevron.style.transform = 'rotate(180deg)';
+        }
+    }
     const data = new FormData();
-    data.append('csrf_token',  csrfToken);
+    data.append('csrf_token',   csrfToken);
     data.append('workspace_id', workspaceId);
-    data.append('acao',        'tecnica_auto');
-    data.append('modalidade',  modalidade);
+    data.append('acao',         'tecnica_auto');
+    data.append('modalidade',   modalidade);
 
     fetch('/api/copilot/report-engine', { method: 'POST', body: data })
         .then(r => r.json())
@@ -854,6 +1057,9 @@ function gerarTecnicaAuto() {
             if (res.ok && res.tecnica) {
                 const el = document.getElementById('tecnica');
                 if (el) { el.value = res.tecnica; markDirty(); }
+                // Atualiza preview no modo radiologista
+                var preview = document.getElementById('preview-tecnica');
+                if (preview) preview.textContent = res.tecnica.substring(0, 60) + (res.tecnica.length > 60 ? '…' : '');
             } else {
                 addMessage('assistant', '⚠️ ' + (res.error || 'Não foi possível gerar a técnica para esta modalidade.'));
             }
@@ -865,6 +1071,14 @@ function gerarTecnicaAuto() {
 
 // ── SUGERIR INDICAÇÃO ─────────────────────────────────────────
 function sugerirIndicacao() {
+    if (isRadiologista) {
+        var body = document.getElementById('body-indicacao');
+        var chevron = document.getElementById('chevron-indicacao');
+        if (body && body.style.display === 'none') {
+            body.style.display = 'block';
+            if (chevron) chevron.style.transform = 'rotate(180deg)';
+        }
+    }
     sendQuick('Com base na modalidade ' + modalidade + ' e no contexto do exame, sugira uma indicação clínica adequada para este laudo.');
 }
 
@@ -875,10 +1089,10 @@ function aplicarDicionario(campo) {
     if (!el || !el.value.trim()) return;
 
     const data = new FormData();
-    data.append('csrf_token',  csrfToken);
+    data.append('csrf_token',   csrfToken);
     data.append('workspace_id', workspaceId);
-    data.append('acao',        'dicionario');
-    data.append('texto',       el.value);
+    data.append('acao',         'dicionario');
+    data.append('texto',        el.value);
 
     fetch('/api/copilot/report-engine', { method: 'POST', body: data })
         .then(r => r.json())
@@ -922,11 +1136,11 @@ function revisarLaudo() {
     fetch('/api/copilot/report-engine', { method: 'POST', body: data })
         .then(r => r.json())
         .then(function(res) {
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-spell-check"></i> Revisar Laudo'; }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-spell-check"></i> Revisar'; }
             addMessage('assistant', res.ok ? res.content : ('⚠️ ' + (res.error || 'Erro ao revisar.')));
         })
         .catch(function() {
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-spell-check"></i> Revisar Laudo'; }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-spell-check"></i> Revisar'; }
             addMessage('assistant', '⚠️ Erro de conexão com o Copilot.');
         });
 }
@@ -1165,9 +1379,9 @@ if (msgs) msgs.scrollTop = msgs.scrollHeight;
 function abrirAbaExame(idx) {
     document.querySelectorAll('.ws-exame-tab').forEach(function(btn) { btn.classList.remove('active'); });
     document.querySelectorAll('.ws-exame-content').forEach(function(div) { div.classList.remove('active'); });
-    var tab = document.querySelector('.ws-exame-tab[data-idx="' + idx + '"]');
+    var tab     = document.querySelector('.ws-exame-tab[data-idx="' + idx + '"]');
     var content = document.getElementById('ws-exame-' + idx);
-    if (tab) tab.classList.add('active');
+    if (tab)     tab.classList.add('active');
     if (content) content.classList.add('active');
 }
 

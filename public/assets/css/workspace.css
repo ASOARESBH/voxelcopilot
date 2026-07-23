@@ -1788,3 +1788,338 @@
     white-space: pre-wrap;
     word-break: break-word;
 }
+
+
+/* ─── MODO RADIOLOGISTA — Painéis Colapsáveis ──────────────── */
+
+/* Grupo de painéis colapsáveis */
+.ws-collapse-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+/* Card colapsável */
+.ws-collapse-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color .15s, box-shadow .15s;
+}
+
+.ws-collapse-card:hover {
+    border-color: #bfdbfe;
+    box-shadow: 0 2px 8px rgba(59,130,246,.07);
+}
+
+/* Card com alerta (indicação vazia) */
+.ws-collapse-alerta {
+    border-color: #fde68a;
+    background: #fffbeb;
+}
+
+.ws-collapse-alerta:hover {
+    border-color: #fbbf24;
+}
+
+/* Header do painel colapsável */
+.ws-collapse-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    cursor: pointer;
+    user-select: none;
+    gap: 12px;
+    min-height: 44px;
+}
+
+.ws-collapse-header:hover {
+    background: #f8fafc;
+}
+
+.ws-collapse-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #374151;
+    flex: 1;
+    min-width: 0;
+}
+
+.ws-collapse-title > i {
+    color: #6366f1;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+/* Preview do conteúdo (quando colapsado) */
+.ws-collapse-preview {
+    font-size: 11.5px;
+    font-weight: 400;
+    color: #94a3b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 280px;
+}
+
+/* Badges dentro do header */
+.ws-collapse-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.ws-collapse-badge-warn {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.ws-collapse-badge-opt {
+    background: #f1f5f9;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+/* Lado direito do header (botões + chevron) */
+.ws-collapse-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* Chevron animado */
+.ws-collapse-chevron {
+    color: #94a3b8;
+    font-size: 12px;
+    transition: transform .2s ease;
+    flex-shrink: 0;
+}
+
+/* Corpo colapsável */
+.ws-collapse-body {
+    padding: 0 16px 14px;
+    border-top: 1px solid #f1f5f9;
+    background: #fafbfc;
+}
+
+.ws-collapse-body .ws-textarea {
+    margin-top: 10px;
+    background: #fff;
+}
+
+/* ─── MODO RADIOLOGISTA — Destaque dos campos principais ─────── */
+
+/* Card com destaque (Achados e Impressão no modo radiologista) */
+.ws-section-destaque {
+    border: 1.5px solid #bfdbfe !important;
+    box-shadow: 0 2px 12px rgba(59,130,246,.10) !important;
+}
+
+.ws-section-destaque:focus-within {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59,130,246,.12), 0 4px 16px rgba(59,130,246,.12) !important;
+}
+
+/* Textarea com destaque (maior, mais visível) */
+.ws-textarea-destaque {
+    font-size: 14px !important;
+    line-height: 1.75 !important;
+    letter-spacing: .01em;
+    color: #1e293b !important;
+}
+
+.ws-textarea-destaque::placeholder {
+    color: #94a3b8;
+    font-style: italic;
+    font-size: 13px;
+}
+
+/* Título da seção Achados com cor de destaque */
+.ws-section-achados .ws-section-title > i {
+    color: #0ea5e9;
+}
+
+/* Título da seção Impressão com cor de destaque */
+.ws-section-impressao .ws-section-title > i {
+    color: #6366f1;
+}
+
+/* ─── MODO RADIOLOGISTA — Regra de separação ─────────────────── */
+.ws-section-regra {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10.5px;
+    font-weight: 400;
+    color: #94a3b8;
+    margin-left: 4px;
+}
+
+.ws-section-regra i {
+    color: #94a3b8;
+    font-size: 10px;
+}
+
+/* ─── PRINT-ONLY (Cabeçalho e Identificação) ─────────────────── */
+.ws-print-only {
+    display: none;
+}
+
+@media print {
+    .ws-print-only {
+        display: block !important;
+        margin-bottom: 20px;
+    }
+
+    .ws-topbar,
+    .ws-quality-bar,
+    .ws-copilot,
+    .ws-collapse-group,
+    .ws-section-actions,
+    .ws-btn,
+    .ws-quick-actions,
+    .ws-chat-input-area,
+    #ai-messages,
+    .ws-autotextos,
+    .ws-exames-anteriores {
+        display: none !important;
+    }
+
+    .ws-body {
+        display: block !important;
+        grid-template-columns: 1fr !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    .ws-editor {
+        overflow: visible !important;
+        height: auto !important;
+        padding: 0 !important;
+    }
+
+    .ws-section-card {
+        border: none !important;
+        box-shadow: none !important;
+        margin-bottom: 16px !important;
+        page-break-inside: avoid;
+    }
+
+    .ws-textarea,
+    .ws-textarea-destaque {
+        border: none !important;
+        padding: 0 !important;
+        resize: none !important;
+        background: transparent !important;
+        min-height: auto !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+}
+
+/* Cabeçalho de impressão */
+.ws-cabecalho-print {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 16px 0;
+    border-bottom: 2px solid #1e3a5f;
+    margin-bottom: 16px;
+    gap: 24px;
+}
+
+.ws-cabecalho-inst {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.ws-cabecalho-logo {
+    height: 48px;
+    width: auto;
+    object-fit: contain;
+}
+
+.ws-cabecalho-logo-placeholder {
+    width: 48px;
+    height: 48px;
+    background: #1e3a5f;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 20px;
+}
+
+.ws-cabecalho-meta {
+    font-size: 12px;
+    color: #374151;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    text-align: right;
+}
+
+/* ─── BOTÃO REVISAR na topbar ─────────────────────────────────── */
+.ws-btn-review {
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+    font-weight: 600;
+}
+
+.ws-btn-review:hover {
+    background: #dcfce7;
+    border-color: #86efac;
+}
+
+.ws-btn-review:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+/* ─── BOTÃO XS (extra pequeno) ────────────────────────────────── */
+.ws-btn-xs {
+    padding: 4px 10px !important;
+    font-size: 11px !important;
+    height: 28px;
+    border-radius: 6px !important;
+}
+
+/* ─── SEÇÃO OPCIONAL ──────────────────────────────────────────── */
+.ws-section-opcional {
+    font-size: 10px;
+    font-weight: 500;
+    color: #94a3b8;
+    background: #f1f5f9;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+}
+
+/* ─── LAYOUT 2 COLUNAS (Recomendações + CID) ─────────────────── */
+.ws-row-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+@media (max-width: 900px) {
+    .ws-row-2col {
+        grid-template-columns: 1fr;
+    }
+}
