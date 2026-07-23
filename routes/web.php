@@ -182,8 +182,9 @@ Router::get('/api/mascaras/buscar',        'MascarasController@buscar');
 Router::get('/api/mascaras/{id}/corpo',    'MascarasController@getCorpo');
 
 // ─── API COPILOT (AJAX) ──────────────────────────────────────────────────────
-Router::post('/api/copilot/chat',         'CopilotApiController@chat');
-Router::post('/api/copilot/sugestao',     'CopilotApiController@sugestao');
+Router::post('/api/copilot/chat',          'CopilotApiController@chat');
+Router::post('/api/copilot/sugestao',      'CopilotApiController@sugestao');
+Router::post('/api/copilot/report-engine', 'CopilotApiController@reportEngine');
 Router::post('/api/vision/analisar',      'VisionAIController@analisar');
 Router::post('/api/speech/transcrever',   'SpeechController@transcrever');
 Router::post('/api/integracoes/testar',   'IntegracoesController@testar');

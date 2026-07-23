@@ -7,6 +7,7 @@ use App\Core\Database;
 use App\Middlewares\TenantMiddleware;
 use App\Services\PacsService;
 use App\Services\CopilotAIService;
+use App\Services\ReportEngineService;
 
 class WorkspaceController extends Controller {
 
@@ -376,6 +377,25 @@ class WorkspaceController extends Controller {
             $examesAnteriores = [];
         }
 
+        // ── Report Engine: Cabeçalho, Assinatura e Quality Engine ──
+        $reportEngine    = new ReportEngineService();
+        $reportCabecalho = $reportEngine->getCabecalho((int)$laudo->workspace_id, $tenantId);
+        $reportAssinatura = [];
+        if ($laudo->status === 'assinado') {
+            $reportAssinatura = $reportEngine->getAssinatura((int)$laudo->id, $medicoId);
+        }
+
+        // Quality Engine: valida o laudo atual
+        $qualityAlertas = $reportEngine->validate([
+            'modalidade'   => $laudo->modalidade ?? '',
+            'sexo'         => $laudo->patient_sexo ?? '',
+            'indicacao'    => $laudo->indicacao ?? '',
+            'tecnica'      => $laudo->tecnica ?? '',
+            'achados'      => $laudo->achados ?? '',
+            'impressao'    => $laudo->impressao ?? '',
+            'recomendacao' => $laudo->recomendacao ?? '',
+        ]);
+
         $this->view('workspace/show', [
             'title'              => 'Laudo — VOXEL Copilot',
             'pageTitle'          => 'Editor de Laudo',
@@ -389,6 +409,9 @@ class WorkspaceController extends Controller {
             'csrf_token'         => $this->csrfToken(),
             'layoutRadiologista' => $layoutRadiologista,
             'examesAnteriores'   => $examesAnteriores,
+            'reportCabecalho'    => $reportCabecalho,
+            'reportAssinatura'   => $reportAssinatura,
+            'qualityAlertas'     => $qualityAlertas,
         ]);
     }
 

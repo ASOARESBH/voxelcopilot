@@ -325,6 +325,44 @@ class CopilotAIService {
         return 0;
     }
 
+    /**
+     * Chat com system prompt customizado (usado pelo Report Engine)
+     * Permite que o ReportEngineService injete seu próprio system prompt enriquecido
+     */
+    public function chatComPrompt(int $workspaceId, string $userMessage, string $systemPrompt): array {
+        $medicoId = Auth::userId();
+        $tenantId = $this->resolveTenantId($medicoId);
+        $pdo      = Database::getInstance();
+
+        $messages = [
+            ['role' => 'system', 'content' => $systemPrompt],
+            ['role' => 'user',   'content' => $userMessage],
+        ];
+
+        try {
+            $response = $this->callOpenAI($messages);
+            $content  = $response['choices'][0]['message']['content'] ?? '';
+            $tokens   = $response['usage']['total_tokens'] ?? 0;
+
+            // Salva no histórico
+            $pdo->prepare("
+                INSERT INTO cop_ia_conversas (workspace_id, tenant_id, medico_id, role, conteudo, modelo, tokens, created_at)
+                VALUES (:wid, :tid, :mid, 'user', :msg, :model, 0, NOW())
+            ")->execute(['wid'=>$workspaceId,'tid'=>$tenantId,'mid'=>$medicoId,'msg'=>$userMessage,'model'=>$this->model]);
+
+            $pdo->prepare("
+                INSERT INTO cop_ia_conversas (workspace_id, tenant_id, medico_id, role, conteudo, modelo, tokens, created_at)
+                VALUES (:wid, :tid, :mid, 'assistant', :content, :model, :tokens, NOW())
+            ")->execute(['wid'=>$workspaceId,'tid'=>$tenantId,'mid'=>$medicoId,'content'=>$content,'model'=>$this->model,'tokens'=>$tokens]);
+
+            return ['ok' => true, 'content' => $content, 'tokens' => $tokens, 'model' => $this->model];
+
+        } catch (\Throwable $e) {
+            Logger::error('CopilotAI chatComPrompt error', ['error' => $e->getMessage()]);
+            return ['ok' => false, 'error' => $e->getMessage()];
+        }
+    }
+
     private function buildSystemPrompt(string $estilo = 'normal', array $vocab = []): string {
         $vocabStr = '';
         if (!empty($vocab)) {
