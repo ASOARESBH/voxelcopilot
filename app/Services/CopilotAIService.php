@@ -178,7 +178,7 @@ class CopilotAIService {
         string $achados = ''
     ): array {
         $medicoId = Auth::userId();
-        $tenantId = Auth::tenantId();
+        $tenantId = $this->resolveTenantId($medicoId);
 
         // Carrega perfil do médico para personalização
         $pdo    = Database::getInstance();
@@ -248,7 +248,7 @@ class CopilotAIService {
      */
     public function chat(int $workspaceId, string $mensagem): array {
         $medicoId = Auth::userId();
-        $tenantId = Auth::tenantId();
+        $tenantId = $this->resolveTenantId($medicoId);
         $pdo      = Database::getInstance();
 
         $historico = $pdo->prepare("
@@ -286,6 +286,43 @@ class CopilotAIService {
             Logger::error('CopilotAI chat error', ['error' => $e->getMessage()]);
             return ['ok' => false, 'error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Resolve o tenant_id do usuário logado com fallback robusto.
+     * Garante que nunca retorna null para evitar violação de constraint no banco.
+     */
+    private function resolveTenantId(?int $userId): int {
+        // 1. Tenta da sessão (setado pelo login ou impersonação)
+        $tenantId = Auth::tenantId();
+        if ($tenantId) return $tenantId;
+
+        // 2. Fallback: busca direto no banco pelo primeiro tenant ativo do usuário
+        if ($userId) {
+            try {
+                $pdo  = Database::getInstance();
+                $stmt = $pdo->prepare("
+                    SELECT ut.tenant_id FROM cop_user_tenants ut
+                    JOIN cop_tenants t ON t.id = ut.tenant_id
+                    WHERE ut.user_id = :uid AND ut.ativo = 1 AND t.status = 'ativo'
+                    ORDER BY ut.id ASC LIMIT 1
+                ");
+                $stmt->execute(['uid' => $userId]);
+                $row = $stmt->fetch();
+                if ($row) {
+                    $tenantId = (int)$row->tenant_id;
+                    // Seta na sessão para próximas requisições
+                    Auth::setTenant($tenantId);
+                    return $tenantId;
+                }
+            } catch (\Throwable $e) {
+                Logger::error('CopilotAI resolveTenantId error', ['error' => $e->getMessage()]);
+            }
+        }
+
+        // 3. Último recurso: retorna 0 (evita NULL no banco, mas loga o problema)
+        Logger::error('CopilotAI: tenant_id não resolvido', ['user_id' => $userId]);
+        return 0;
     }
 
     private function buildSystemPrompt(string $estilo = 'normal', array $vocab = []): string {

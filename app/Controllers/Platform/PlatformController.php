@@ -510,15 +510,29 @@ class PlatformController extends Controller {
 
         if (!$medico) { $this->redirect('/platform/medicos?erro=medico_nao_encontrado'); }
 
+        // Busca o tenant_id do médico para setar na sessão durante a impersonação
+        $stmtTenant = $pdo->prepare("
+            SELECT ut.tenant_id FROM cop_user_tenants ut
+            JOIN cop_tenants t ON t.id = ut.tenant_id
+            WHERE ut.user_id = :uid AND ut.ativo = 1 AND t.status = 'ativo'
+            ORDER BY ut.id ASC LIMIT 1
+        ");
+        $stmtTenant->execute(['uid' => $medicoId]);
+        $tenantRow = $stmtTenant->fetch();
+        $medicoTenantId = $tenantRow ? (int)$tenantRow->tenant_id : null;
+
+        // Salva contexto original do admin
         $_SESSION['impersonating_tenant_id'] = $medicoId;
         $_SESSION['original_user']           = $_SESSION['user'];
         $_SESSION['original_user_id']        = $_SESSION['user_id'];
+        $_SESSION['original_tenant_id']      = $_SESSION['tenant_id'] ?? null;
 
         unset($medico->password);
-        $_SESSION['user']    = $medico;
-        $_SESSION['user_id'] = $medico->id;
+        $_SESSION['user']      = $medico;
+        $_SESSION['user_id']   = $medico->id;
+        $_SESSION['tenant_id'] = $medicoTenantId; // Seta o tenant do médico impersonado
 
-        AuditLogger::log('impersonate_medico', 'user', $medicoId, ['by' => Auth::userId()]);
+        AuditLogger::log('impersonate_medico', 'user', $medicoId, ['by' => Auth::userId(), 'tenant_id' => $medicoTenantId]);
         $this->redirect('/dashboard');
     }
 
@@ -527,14 +541,15 @@ class PlatformController extends Controller {
             $this->redirect('/platform/dashboard');
         }
 
-        $_SESSION['user']    = $_SESSION['original_user'];
-        $_SESSION['user_id'] = $_SESSION['original_user_id'];
+        $_SESSION['user']      = $_SESSION['original_user'];
+        $_SESSION['user_id']   = $_SESSION['original_user_id'];
+        $_SESSION['tenant_id'] = $_SESSION['original_tenant_id'] ?? null; // Restaura tenant original do admin
 
         unset(
             $_SESSION['impersonating_tenant_id'],
             $_SESSION['original_user'],
             $_SESSION['original_user_id'],
-            $_SESSION['tenant_id']
+            $_SESSION['original_tenant_id']
         );
 
         $this->redirect('/platform/medicos');
