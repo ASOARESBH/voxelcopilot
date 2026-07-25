@@ -345,7 +345,7 @@ $qualityAlertas = $qualityAlertas   ?? [];
             <div class="ws-section-body">
                 <textarea class="ws-textarea ws-textarea-destaque" id="achados" name="achados"
                     placeholder="Descreva os achados objetivamente, por sistemas/órgãos. Não use: provável, compatível, sugere, indica, pode representar, favorece."
-                    style="min-height:380px;"
+                    style="min-height:560px;"
                     <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
                 ><?= htmlspecialchars($laudo->achados ?? '') ?></textarea>
             </div>
