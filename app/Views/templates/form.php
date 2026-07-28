@@ -36,6 +36,22 @@ $modAtual  = $isEdicao ? (is_array($template) ? $template['modalidade'] : $templ
           <input type="checkbox" name="publico" id="publico" value="1" <?= ($isEdicao && (is_array($template) ? $template['publico'] : $template->publico)) ? 'checked' : '' ?>>
           <label for="publico">Compartilhar com outros médicos da clínica</label>
         </div>
+        <div class="form-group" style="margin-top:16px;">
+          <label class="form-label" style="display:flex;align-items:center;gap:6px;">
+            <i class="fa-solid fa-tag" style="color:#6366f1;"></i>
+            TAG DICOM Study Description
+            <span style="font-size:.75rem;color:#94a3b8;font-weight:400;">(0008,1030)</span>
+          </label>
+          <input type="text" name="dicom_study_description"
+            value="<?= htmlspecialchars(is_array($template ?? null) ? ($template['dicom_study_description'] ?? '') : ($template->dicom_study_description ?? '')) ?>"
+            class="form-control"
+            placeholder="Ex: CT ABDOMEN E PELVE C/CONTRASTE"
+            maxlength="500">
+          <p style="font-size:.72rem;color:#94a3b8;margin-top:4px;">
+            Quando um laudo for aberto com este valor na TAG DICOM, este template será sugerido automaticamente.
+            Deixe em branco para não vincular.
+          </p>
+        </div>
       </div>
 
       <!-- Editor de Seções -->

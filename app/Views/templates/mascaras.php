@@ -165,7 +165,7 @@ $buscaAtiva   = $busca ?? '';
     <div class="table-wrap">
         <table class="table">
             <thead>
-                <tr>
+                <tr data-template-id="<?= $tid ?>">
                     <th>Nome</th>
                     <th>Modalidade</th>
                     <th>Origem</th>
@@ -832,15 +832,13 @@ function salvarDicomTag() {
             // Atualiza a célula na tabela sem recarregar a página
             const rows = document.querySelectorAll('tbody tr');
             rows.forEach(function(row) {
-                const editLink = row.querySelector('a[href*="/templates/' + _dicomTemplateId + '/editar"]');
-                if (editLink) {
-                    const dicomCell = row.cells[3];
-                    if (dicomCell) {
-                        if (valor) {
-                            dicomCell.innerHTML = '<span class="dicom-tag-badge" title="TAG DICOM vinculada: ' + escHtml(valor) + '"><i class="fa-solid fa-link"></i>' + escHtml(valor.substring(0, 40)) + (valor.length > 40 ? '\u2026' : '') + '</span>';
-                        } else {
-                            dicomCell.innerHTML = '<button class="btn-dicom-link" onclick="abrirModalDicom(' + _dicomTemplateId + ', ' + JSON.stringify(_dicomTemplateName) + ')"><i class="fa-solid fa-tag"></i> Vincular</button>';
-                        }
+                if (String(row.getAttribute('data-template-id')) !== String(_dicomTemplateId)) return;
+                const dicomCell = row.cells[3];
+                if (dicomCell) {
+                    if (valor) {
+                        dicomCell.innerHTML = '<span class="dicom-tag-badge" title="TAG DICOM vinculada: ' + escHtml(valor) + '"><i class="fa-solid fa-link"></i>' + escHtml(valor.substring(0, 40)) + (valor.length > 40 ? '\u2026' : '') + '</span>';
+                    } else {
+                        dicomCell.innerHTML = '<button class="btn-dicom-link" onclick="abrirModalDicom(' + _dicomTemplateId + ', ' + JSON.stringify(_dicomTemplateName) + ')"><i class="fa-solid fa-tag"></i> Vincular</button>';
                     }
                 }
             });

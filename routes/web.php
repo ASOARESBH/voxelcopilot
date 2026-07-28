@@ -177,9 +177,9 @@ Router::post('/api/ai/router',                        'AiRouterController@apiRou
 Router::get('/api/pacs/buscar',           'PacsController@buscar');
 
 // ─── API TEMPLATES (AJAX) ───────────────────────────────────────────────────
+Router::get('/api/templates/sugerir-por-dicom',  'TemplatesController@apiSugerirPorDicom');
 Router::get('/api/templates/{id}/corpo',         'TemplatesController@getCorpo');
 Router::post('/api/templates/{id}/dicom-study',  'TemplatesController@apiSalvarDicomStudy');
-Router::get('/api/templates/sugerir-por-dicom',  'TemplatesController@apiSugerirPorDicom');
 Router::get('/api/mascaras/buscar',              'MascarasController@buscar');
 Router::get('/api/mascaras/{id}/corpo',          'MascarasController@getCorpo');
 

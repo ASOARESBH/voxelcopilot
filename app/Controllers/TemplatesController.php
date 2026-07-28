@@ -103,13 +103,13 @@ class TemplatesController extends Controller {
         $tenantId = Auth::tenantId();
 
         if ($tenantId) {
-            $stmt = $pdo->prepare("SELECT * FROM cop_templates WHERE id = :id AND tenant_id = :tid AND medico_id = :mid LIMIT 1");
-            $stmt->execute(['id' => $id, 'tid' => $tenantId, 'mid' => $medicoId]);
+            $stmt = $pdo->prepare("SELECT * FROM cop_templates WHERE id = :id AND tenant_id = :tid AND ativo = 1 LIMIT 1");
+            $stmt->execute(['id' => $id, 'tid' => $tenantId]);
             $template = $stmt->fetch();
         } else {
-            $templates = $this->getTemplatesDefault();
-            $template  = null;
-            foreach ($templates as $t) { if ($t['id'] == $id) { $template = (object)$t; break; } }
+            $stmt = $pdo->prepare("SELECT * FROM cop_templates WHERE id = :id AND user_id = :uid AND ativo = 1 LIMIT 1");
+            $stmt->execute(['id' => $id, 'uid' => $medicoId]);
+            $template = $stmt->fetch();
         }
 
         if (!$template) { header('Location: /templates'); exit; }

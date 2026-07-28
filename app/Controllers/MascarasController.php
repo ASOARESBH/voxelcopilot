@@ -42,7 +42,7 @@ class MascarasController extends Controller {
         $biblioteca = $stmtBib->fetchAll();
 
         // ── Templates importados pelo médico ─────────────────────────────────
-        $sqlTpl  = "SELECT id, nome AS nome_amigavel, modalidade, especialidade, uso_count, origem, origem_arquivo, 'template' AS origem_tipo FROM cop_templates WHERE ativo = 1 AND origem IN ('importado','docx')";
+        $sqlTpl  = "SELECT id, nome AS nome_amigavel, modalidade, especialidade, uso_count, origem, origem_arquivo, COALESCE(dicom_study_description, '') AS dicom_study_description, 'template' AS origem_tipo FROM cop_templates WHERE ativo = 1 AND origem IN ('importado','docx')";
         $pTpl    = [];
         if ($tenantId) {
             $sqlTpl .= " AND tenant_id = :tid";
