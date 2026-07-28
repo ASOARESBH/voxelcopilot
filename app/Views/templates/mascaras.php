@@ -169,6 +169,11 @@ $buscaAtiva   = $busca ?? '';
                     <th>Nome</th>
                     <th>Modalidade</th>
                     <th>Origem</th>
+                    <th title="TAG DICOM (0008,1030) — vinculação automática no Workspace">
+                        <i class="fa-solid fa-tag" style="color:#6366f1;font-size:.75rem;"></i>
+                        Study Description
+                        <span style="font-size:.65rem;font-weight:400;color:var(--muted);">(DICOM)</span>
+                    </th>
                     <th>Usos</th>
                     <th>Ações</th>
                 </tr>
@@ -180,12 +185,26 @@ $buscaAtiva   = $busca ?? '';
                     $tnome = is_array($t) ? $t['nome_amigavel'] : $t->nome_amigavel;
                     $tmod  = is_array($t) ? $t['modalidade']    : $t->modalidade;
                     $torig = is_array($t) ? ($t['origem_arquivo'] ?? '') : ($t->origem_arquivo ?? '');
-                    $tusos = is_array($t) ? ($t['uso_count'] ?? 0) : ($t->uso_count ?? 0);
+                    $tusos  = is_array($t) ? ($t['uso_count'] ?? 0) : ($t->uso_count ?? 0);
+                    $tdicom = is_array($t) ? ($t['dicom_study_description'] ?? '') : ($t->dicom_study_description ?? '');
                 ?>
                 <tr>
                     <td><strong><?= htmlspecialchars($tnome) ?></strong></td>
                     <td><span class="badge badge-mod"><?= htmlspecialchars($tmod) ?></span></td>
                     <td><span style="font-size:.75rem;color:var(--muted);"><?= htmlspecialchars($torig) ?></span></td>
+                    <td>
+                        <?php if ($tdicom): ?>
+                        <span class="dicom-tag-badge" title="TAG DICOM vinculada: <?= htmlspecialchars($tdicom) ?>">
+                            <i class="fa-solid fa-link"></i>
+                            <?= htmlspecialchars(mb_substr($tdicom, 0, 40)) ?><?= mb_strlen($tdicom) > 40 ? '…' : '' ?>
+                        </span>
+                        <?php else: ?>
+                        <button class="btn-dicom-link" onclick="abrirModalDicom(<?= $tid ?>, <?= json_encode($tnome) ?>)"
+                            title="Vincular TAG DICOM Study Description">
+                            <i class="fa-solid fa-tag"></i> Vincular
+                        </button>
+                        <?php endif; ?>
+                    </td>
                     <td><?= (int)$tusos ?></td>
                     <td>
                         <a href="/templates/<?= $tid ?>/editar" class="btn btn-sm btn-ghost">
@@ -402,6 +421,40 @@ $buscaAtiva   = $busca ?? '';
 .stat-icon { width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
 .stat-value { font-size:1.5rem; font-weight:700; color:#1e293b; line-height:1; }
 .stat-label { font-size:.75rem; color:var(--muted); margin-top:3px; }
+
+/* DICOM Study Description */
+.dicom-tag-badge {
+    display:inline-flex; align-items:center; gap:5px;
+    background:#ede9fe; color:#5b21b6;
+    border:1px solid #c4b5fd;
+    border-radius:20px; padding:3px 10px;
+    font-size:.72rem; font-weight:600;
+    max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    cursor:default;
+}
+.dicom-tag-badge i { color:#7c3aed; font-size:.65rem; flex-shrink:0; }
+.btn-dicom-link {
+    display:inline-flex; align-items:center; gap:5px;
+    background:#f5f3ff; color:#6366f1;
+    border:1px dashed #a5b4fc;
+    border-radius:20px; padding:3px 10px;
+    font-size:.72rem; font-weight:500;
+    cursor:pointer; transition:all .15s;
+}
+.btn-dicom-link:hover { background:#ede9fe; border-color:#818cf8; color:#4f46e5; }
+
+/* Modal DICOM */
+.dicom-modal-info { background:#f5f3ff; border:1px solid #ddd6fe; border-radius:10px; padding:14px 16px; margin-bottom:16px; font-size:.83rem; color:#4c1d95; }
+.dicom-modal-info strong { display:block; margin-bottom:4px; font-size:.85rem; }
+.dicom-input-wrap { position:relative; }
+.dicom-input-wrap input { width:100%; padding:10px 40px 10px 14px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:.9rem; color:#1e293b; outline:none; transition:border-color .15s; }
+.dicom-input-wrap input:focus { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.12); }
+.dicom-input-clear { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:#94a3b8; cursor:pointer; font-size:.85rem; padding:4px; }
+.dicom-input-clear:hover { color:#ef4444; }
+.dicom-examples { margin-top:10px; }
+.dicom-examples p { font-size:.75rem; color:var(--muted); margin-bottom:6px; }
+.dicom-example-tag { display:inline-block; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:3px 8px; font-size:.72rem; color:#475569; cursor:pointer; margin:2px; transition:all .12s; }
+.dicom-example-tag:hover { background:#ede9fe; border-color:#a5b4fc; color:#4f46e5; }
 </style>
 
 <!-- ══════════════════════════════════════════════════════════
@@ -725,4 +778,144 @@ function escHtml(str) {
     if (!str) return '';
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ── Modal DICOM Study Description ───────────────────────────
+let _dicomTemplateId   = null;
+let _dicomTemplateName = '';
+
+function abrirModalDicom(templateId, templateNome) {
+    _dicomTemplateId   = templateId;
+    _dicomTemplateName = templateNome;
+    document.getElementById('dicom-template-nome').textContent = templateNome;
+    document.getElementById('dicom-study-input').value = '';
+    document.getElementById('modalDicom').style.display = 'flex';
+    setTimeout(function() { document.getElementById('dicom-study-input').focus(); }, 100);
+}
+
+function fecharModalDicom(e) {
+    if (!e || e.target === document.getElementById('modalDicom')) {
+        document.getElementById('modalDicom').style.display = 'none';
+        _dicomTemplateId = null;
+    }
+}
+
+function usarExemploDicom(valor) {
+    document.getElementById('dicom-study-input').value = valor;
+    document.getElementById('dicom-study-input').focus();
+}
+
+function limparDicomInput() {
+    document.getElementById('dicom-study-input').value = '';
+    document.getElementById('dicom-study-input').focus();
+}
+
+function salvarDicomTag() {
+    if (!_dicomTemplateId) return;
+    const valor = document.getElementById('dicom-study-input').value.trim();
+    const btn   = document.getElementById('btn-salvar-dicom');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+
+    fetch('/api/templates/' + _dicomTemplateId + '/dicom-study', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dicom_study_description: valor })
+    })
+    .then(r => r.json())
+    .then(function(res) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-save"></i> Salvar';
+        if (res.ok) {
+            mostrarToast('TAG DICOM vinculada com sucesso!', 'success');
+            document.getElementById('modalDicom').style.display = 'none';
+            // Atualiza a célula na tabela sem recarregar a página
+            const rows = document.querySelectorAll('tbody tr');
+            rows.forEach(function(row) {
+                const editLink = row.querySelector('a[href*="/templates/' + _dicomTemplateId + '/editar"]');
+                if (editLink) {
+                    const dicomCell = row.cells[3];
+                    if (dicomCell) {
+                        if (valor) {
+                            dicomCell.innerHTML = '<span class="dicom-tag-badge" title="TAG DICOM vinculada: ' + escHtml(valor) + '"><i class="fa-solid fa-link"></i>' + escHtml(valor.substring(0, 40)) + (valor.length > 40 ? '\u2026' : '') + '</span>';
+                        } else {
+                            dicomCell.innerHTML = '<button class="btn-dicom-link" onclick="abrirModalDicom(' + _dicomTemplateId + ', ' + JSON.stringify(_dicomTemplateName) + ')"><i class="fa-solid fa-tag"></i> Vincular</button>';
+                        }
+                    }
+                }
+            });
+            _dicomTemplateId = null;
+        } else {
+            mostrarToast(res.msg || 'Erro ao salvar TAG DICOM.', 'danger');
+        }
+    })
+    .catch(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-save"></i> Salvar';
+        mostrarToast('Erro de conexão.', 'danger');
+    });
+}
 </script>
+
+<!-- ══ MODAL DICOM STUDY DESCRIPTION ═════════════════════════════════════════════════════════════════ -->
+<div id="modalDicom" class="modal-overlay" style="display:none;" onclick="fecharModalDicom(event)">
+    <div class="modal-box" style="max-width:520px;">
+        <div class="modal-header">
+            <h3>
+                <i class="fa-solid fa-tag" style="color:#6366f1;"></i>
+                Vincular TAG DICOM
+            </h3>
+            <button onclick="fecharModalDicom()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--muted);">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="dicom-modal-info">
+                <strong><i class="fa-solid fa-file-medical"></i> Template: <span id="dicom-template-nome"></span></strong>
+                Informe o valor da TAG DICOM <strong>(0008,1030) StudyDescription</strong> que identifica este tipo de exame.
+                Quando o médico abrir um laudo cujo DICOM contenha esse valor, este template será sugerido automaticamente.
+            </div>
+
+            <label style="font-size:.85rem;font-weight:600;color:#374151;display:block;margin-bottom:6px;">
+                Study Description <span style="color:#6366f1;">(0008,1030)</span>
+            </label>
+            <div class="dicom-input-wrap">
+                <input type="text" id="dicom-study-input"
+                    placeholder="Ex: CT ABDOMEN E PELVE C/CONTRASTE"
+                    maxlength="500"
+                    onkeydown="if(event.key==='Enter') salvarDicomTag()">
+                <button class="dicom-input-clear" onclick="limparDicomInput()" title="Limpar">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="dicom-examples">
+                <p><i class="fa-solid fa-lightbulb" style="color:#f59e0b;"></i> Exemplos de valores comuns:</p>
+                <span class="dicom-example-tag" onclick="usarExemploDicom('CT ABDOMEN')">CT ABDOMEN</span>
+                <span class="dicom-example-tag" onclick="usarExemploDicom('CT TORAX')">CT TORAX</span>
+                <span class="dicom-example-tag" onclick="usarExemploDicom('CT CRANIO')">CT CRANIO</span>
+                <span class="dicom-example-tag" onclick="usarExemploDicom('CT ABDOMEN E PELVE')">CT ABDOMEN E PELVE</span>
+                <span class="dicom-example-tag" onclick="usarExemploDicom('CT COLUNA LOMBAR')">CT COLUNA LOMBAR</span>
+                <span class="dicom-example-tag" onclick="usarExemploDicom('MR BRAIN')">MR BRAIN</span>
+                <span class="dicom-example-tag" onclick="usarExemploDicom('MR SPINE')">MR SPINE</span>
+                <span class="dicom-example-tag" onclick="usarExemploDicom('US ABDOMEN')">US ABDOMEN</span>
+                <span class="dicom-example-tag" onclick="usarExemploDicom('RX TORAX PA')">RX TORAX PA</span>
+                <span class="dicom-example-tag" onclick="usarExemploDicom('ANGIO CT AORTA')">ANGIO CT AORTA</span>
+            </div>
+
+            <p style="font-size:.72rem;color:var(--muted);margin-top:14px;">
+                <i class="fa-solid fa-circle-info"></i>
+                Deixe em branco para remover a vinculação DICOM deste template.
+                A comparação é feita ignorando maiúsculas/minúsculas e espaços extras.
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="fecharModalDicom()">
+                <i class="fa-solid fa-xmark"></i> Cancelar
+            </button>
+            <button id="btn-salvar-dicom" class="btn btn-primary" onclick="salvarDicomTag()">
+                <i class="fa-solid fa-save"></i> Salvar
+            </button>
+        </div>
+    </div>
+</div>

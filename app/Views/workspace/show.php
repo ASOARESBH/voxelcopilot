@@ -37,9 +37,21 @@ $qualityAlertas = $qualityAlertas   ?? [];
 
     <div class="ws-topbar-actions">
 
+        <!-- Banner DICOM: sugestão automática de template -->
+        <div id="dicom-sugestao-banner" style="display:none;" class="ws-dicom-banner">
+            <i class="fa-solid fa-tag" style="color:#6366f1;"></i>
+            <span id="dicom-sugestao-texto">Template sugerido pelo DICOM</span>
+            <div id="dicom-sugestao-btns" style="display:flex;gap:6px;margin-left:auto;"></div>
+            <button onclick="fecharDicomBanner()" class="ws-dicom-banner-close" title="Fechar">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
         <!-- Buscar Template -->
         <?php if ($laudo->status === 'rascunho' && (!empty($templates) || !empty($mascarasBiblioteca))): ?>
-        <div class="ws-template-search-wrap" id="tpl-wrap">
+        <div class="ws-template-search-wrap" id="tpl-wrap"
+             data-study-desc="<?= htmlspecialchars($laudo->study_description ?? '') ?>"
+             data-modalidade="<?= htmlspecialchars($laudo->modalidade ?? '') ?>">
             <div class="ws-template-search-box" onclick="abrirBuscaTemplate()" id="tpl-box">
                 <i class="fa-solid fa-magnifying-glass" style="color:var(--muted);font-size:.8rem;"></i>
                 <span id="tpl-placeholder">Buscar Template...</span>
@@ -1389,4 +1401,57 @@ function focarChat() {
     var input = document.getElementById('ai-input');
     if (input) { input.focus(); input.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 }
+
+// ── DICOM Study Description: sugestão automática de template ──────────────
+document.addEventListener('DOMContentLoaded', function() {
+    var wrap = document.getElementById('tpl-wrap');
+    if (!wrap) return;
+    var studyDesc = wrap.getAttribute('data-study-desc') || '';
+    var modalidade = wrap.getAttribute('data-modalidade') || '';
+    if (!studyDesc) return;
+
+    fetch('/api/templates/sugerir-por-dicom?study_description=' + encodeURIComponent(studyDesc) + '&modalidade=' + encodeURIComponent(modalidade))
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (!res.ok || !res.sugestoes || res.sugestoes.length === 0) return;
+            var banner = document.getElementById('dicom-sugestao-banner');
+            var texto  = document.getElementById('dicom-sugestao-texto');
+            var btns   = document.getElementById('dicom-sugestao-btns');
+            if (!banner || !texto || !btns) return;
+
+            var count = res.sugestoes.length;
+            texto.innerHTML = '<strong>' + count + ' template' + (count > 1 ? 's' : '') + ' sugerido' + (count > 1 ? 's' : '') + ' pelo DICOM</strong>'
+                + ' &mdash; Study Description: <em>' + escHtml(studyDesc) + '</em>';
+
+            btns.innerHTML = '';
+            res.sugestoes.slice(0, 3).forEach(function(s) {
+                var btn = document.createElement('button');
+                btn.className = 'ws-dicom-sugestao-btn';
+                btn.title = (s.match_tipo === 'exato' ? 'Match exato' : 'Match parcial') + ' — ' + s.nome;
+                btn.innerHTML = (s.match_tipo === 'exato'
+                    ? '<i class="fa-solid fa-circle-check" style="color:#22c55e;"></i> '
+                    : '<i class="fa-solid fa-circle-half-stroke" style="color:#f59e0b;"></i> ')
+                    + escHtml(s.nome.length > 28 ? s.nome.substring(0, 28) + '…' : s.nome);
+                btn.onclick = function() {
+                    selecionarTemplate(s.id, 'template', s.nome);
+                    fecharDicomBanner();
+                };
+                btns.appendChild(btn);
+            });
+
+            banner.style.display = 'flex';
+        })
+        .catch(function() { /* silencioso */ });
+});
+
+function fecharDicomBanner() {
+    var banner = document.getElementById('dicom-sugestao-banner');
+    if (banner) banner.style.display = 'none';
+}
+
+function escHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 </script>
