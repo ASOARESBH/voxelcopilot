@@ -153,7 +153,7 @@ $qualityAlertas = $qualityAlertas   ?? [];
         </span>
         <i class="fa-solid fa-chevron-down" id="qe-chevron"></i>
     </div>
-    <div class="ws-quality-list" id="quality-list">
+    <div class="ws-quality-list" id="quality-list" style="display:none;">
         <?php foreach ($qualityAlertas as $alerta): ?>
         <div class="ws-quality-item ws-quality-<?= htmlspecialchars($alerta['tipo']) ?>">
             <?php if ($alerta['tipo'] === 'erro'):  echo '<i class="fa-solid fa-circle-xmark"></i>'; endif; ?>
@@ -384,7 +384,7 @@ $qualityAlertas = $qualityAlertas   ?? [];
             <div class="ws-section-body">
                 <textarea class="ws-textarea ws-textarea-destaque" id="impressao" name="impressao"
                     placeholder="• Interpretação clínica em tópicos&#10;• Resumo objetivo dos achados mais relevantes&#10;• Correlação com a indicação clínica"
-                    style="min-height:200px;"
+                    style="min-height:340px;"
                     <?= $laudo->status !== 'rascunho' ? 'readonly' : '' ?>
                 ><?= htmlspecialchars($laudo->impressao ?? '') ?></textarea>
             </div>
@@ -661,9 +661,60 @@ $qualityAlertas = $qualityAlertas   ?? [];
             </div>
         </div>
 
+        <!-- ── HISTÓRICO DE EXAMES (modo Radiologista) ── -->
+        <?php if (!empty($examesAnteriores)): ?>
+        <div class="ws-section-card ws-exames-anteriores ws-historico-rad" id="ws-exames-ant">
+            <div class="ws-section-header">
+                <div class="ws-section-title">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    Histórico de Exames
+                    <span class="ws-exames-badge"><?= count($examesAnteriores) ?></span>
+                </div>
+                <div class="ws-section-actions">
+                    <span class="ws-exames-hint">Laudos anteriores deste paciente</span>
+                </div>
+            </div>
+            <div class="ws-exames-tabs" id="ws-exames-tabs">
+                <?php foreach ($examesAnteriores as $i => $ex): ?>
+                <button class="ws-exame-tab <?= $i === 0 ? 'active' : '' ?>"
+                        onclick="abrirAbaExame(<?= $i ?>)"
+                        data-idx="<?= $i ?>">
+                    <span class="ws-exame-tab-mod"><?= htmlspecialchars($ex->modalidade ?? '?') ?></span>
+                    <span class="ws-exame-tab-data"><?= $ex->assinado_em ? date('d/m/Y', strtotime($ex->assinado_em)) : date('d/m/Y', strtotime($ex->created_at)) ?></span>
+                </button>
+                <?php endforeach; ?>
+            </div>
+            <?php foreach ($examesAnteriores as $i => $ex): ?>
+            <div class="ws-exame-content <?= $i === 0 ? 'active' : '' ?>" id="ws-exame-<?= $i ?>">
+                <div class="ws-exame-meta">
+                    <span><i class="fa-solid fa-stethoscope"></i> <?= htmlspecialchars($ex->modalidade ?? 'N/A') ?></span>
+                    <span><i class="fa-solid fa-calendar"></i> <?= $ex->assinado_em ? date('d/m/Y', strtotime($ex->assinado_em)) : '—' ?></span>
+                    <?php if ($ex->cid): ?>
+                    <span><i class="fa-solid fa-tag"></i> CID: <?= htmlspecialchars($ex->cid) ?></span>
+                    <?php endif; ?>
+                    <a href="/workspace/<?= $ex->id ?>" target="_blank" class="ws-exame-link">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Ver laudo
+                    </a>
+                </div>
+                <?php if ($ex->achados): ?>
+                <div class="ws-exame-secao">
+                    <div class="ws-exame-secao-titulo"><i class="fa-solid fa-magnifying-glass"></i> Achados</div>
+                    <div class="ws-exame-texto"><?= nl2br(htmlspecialchars($ex->achados)) ?></div>
+                </div>
+                <?php endif; ?>
+                <?php if ($ex->impressao): ?>
+                <div class="ws-exame-secao">
+                    <div class="ws-exame-secao-titulo"><i class="fa-solid fa-lightbulb"></i> Impressão Diagnóstica</div>
+                    <div class="ws-exame-texto"><?= nl2br(htmlspecialchars($ex->impressao)) ?></div>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
 <?php endif; /* fim if $isRadiologista */ ?>
 
-        <!-- ── EXAMES ANTERIORES (ambos os modos) ── -->
+        <!-- ── EXAMES ANTERIORES (modo padrão — não-radiologista) ── -->
         <?php if (!empty($examesAnteriores)): ?>
         <div class="ws-section-card ws-exames-anteriores" id="ws-exames-ant">
             <div class="ws-section-header">
@@ -920,17 +971,7 @@ function toggleCollapse(campo) {
 }
 
 // Abre automaticamente se o campo estiver vazio (Indicação) ou preenchido (Técnica/Recomendação)
-document.addEventListener('DOMContentLoaded', function() {
-    if (!isRadiologista) return;
-    // Indicação: abre se estiver vazia para chamar atenção
-    var indicacaoVal = document.getElementById('indicacao')?.value?.trim();
-    if (!indicacaoVal) {
-        var bodyInd = document.getElementById('body-indicacao');
-        var chevInd = document.getElementById('chevron-indicacao');
-        if (bodyInd) bodyInd.style.display = 'block';
-        if (chevInd) chevInd.style.transform = 'rotate(180deg)';
-    }
-});
+// Auto-abertura da Indicação removida — painel sempre fechado por padrão
 
 // ── AUTO-SAVE ──────────────────────────────────────────────────
 let saveTimer = null;
@@ -1022,7 +1063,7 @@ function toggleQualityBar() {
     if (!list) return;
     const isOpen = list.style.display !== 'none';
     list.style.display = isOpen ? 'none' : 'block';
-    if (chevron) chevron.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+    if (chevron) chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
 }
 
 function irParaCampo(campo) {
