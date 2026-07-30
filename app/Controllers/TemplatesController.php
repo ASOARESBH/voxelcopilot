@@ -77,42 +77,72 @@ class TemplatesController extends Controller {
             ]);
             return;
         }
-        $corpo = trim($_POST['corpo'] ?? $_POST['estrutura'] ?? '');
+        // estrutura_json vem do form como JSON serializado pelo JS
+        $estruturaJson = $estrutura; // já é JSON string do form
+        $estruturaArr  = json_decode($estruturaJson, true) ?: ['indicacao'=>'','tecnica'=>'','achados'=>'','impressao'=>'','recomendacao'=>''];
+        // corpo = achados para compatibilidade com getCorpo()
+        $corpo = $estruturaArr['achados'] ?? $estruturaArr['tecnica'] ?? '';
 
         $pdo->prepare("
-            INSERT INTO cop_templates (tenant_id, user_id, nome, modalidade, dicom_study_description, corpo, ativo, uso_count, created_at, updated_at)
-            VALUES (:tid, :uid, :nome, :mod, :dicom, :corpo, 1, 0, NOW(), NOW())
+            INSERT INTO cop_templates (tenant_id, user_id, nome, modalidade, dicom_study_description, corpo, estrutura_json, publico, ativo, uso_count, created_at, updated_at)
+            VALUES (:tid, :uid, :nome, :mod, :dicom, :corpo, :estrutura, :publico, 1, 0, NOW(), NOW())
         ")->execute([
-            'tid'   => $tenantId,
-            'uid'   => $medicoId,
-            'nome'  => $nome,
-            'mod'   => $modalidade,
-            'dicom' => $dicomStudy ?: null,
-            'corpo' => $corpo,
+            'tid'      => $tenantId,
+            'uid'      => $medicoId,
+            'nome'     => $nome,
+            'mod'      => $modalidade,
+            'dicom'    => $dicomStudy ?: null,
+            'corpo'    => $corpo,
+            'estrutura'=> $estruturaJson,
+            'publico'  => $publico,
         ]);
 
         header('Location: /templates?sucesso=criado');
         exit;
     }
 
-    public function editar(int $id): void {
+        public function editar(int $id): void {
         AuthMiddleware::handle();
-
         $pdo      = Database::getInstance();
         $medicoId = Auth::userId();
         $tenantId = Auth::tenantId();
-
         if ($tenantId) {
             $stmt = $pdo->prepare("SELECT * FROM cop_templates WHERE id = :id AND tenant_id = :tid AND ativo = 1 LIMIT 1");
             $stmt->execute(['id' => $id, 'tid' => $tenantId]);
             $template = $stmt->fetch();
         } else {
+            // Fallback: busca sem tenant (médico standalone)
             $stmt = $pdo->prepare("SELECT * FROM cop_templates WHERE id = :id AND user_id = :uid AND ativo = 1 LIMIT 1");
             $stmt->execute(['id' => $id, 'uid' => $medicoId]);
             $template = $stmt->fetch();
+            if (!$template) {
+                // Último fallback: busca só por ID (para templates de biblioteca)
+                $stmt = $pdo->prepare("SELECT * FROM cop_templates WHERE id = :id AND ativo = 1 LIMIT 1");
+                $stmt->execute(['id' => $id]);
+                $template = $stmt->fetch();
+            }
+        }
+        if (!$template) { header('Location: /templates'); exit; }
+
+        // Normalizar: se estrutura_json estiver vazio mas corpo existir, converter corpo para estrutura_json
+        $tArr = (array) $template;
+        $estruturaJson = $tArr['estrutura_json'] ?? '';
+        if (empty($estruturaJson) || $estruturaJson === '{}' || $estruturaJson === 'null') {
+            $corpo = $tArr['corpo'] ?? '';
+            // Tentar detectar seções no corpo (padrão do DOCX importado)
+            $estruturaArr = $this->parsearCorpoEmSecoes($corpo);
+            $estruturaJson = json_encode($estruturaArr, JSON_UNESCAPED_UNICODE);
+            // Persistir para evitar reprocessamento futuro
+            $pdo->prepare("UPDATE cop_templates SET estrutura_json=:ej, updated_at=NOW() WHERE id=:id")
+                ->execute(['ej' => $estruturaJson, 'id' => $id]);
         }
 
-        if (!$template) { header('Location: /templates'); exit; }
+        // Injetar estrutura_json normalizado no objeto template
+        if (is_object($template)) {
+            $template->estrutura_json = $estruturaJson;
+        } else {
+            $template['estrutura_json'] = $estruturaJson;
+        }
 
         $this->view('templates/form', [
             'title'        => 'Editar Template — VOXEL Copilot',
@@ -121,6 +151,36 @@ class TemplatesController extends Controller {
             'template'     => $template,
             'modalidades'  => $this->getModalidades(),
         ]);
+    }
+
+    /**
+     * Tenta separar um texto de corpo (importado via DOCX) em seções estruturadas.
+     */
+    private function parsearCorpoEmSecoes(string $corpo): array {
+        $secoes = ['indicacao' => '', 'tecnica' => '', 'achados' => '', 'impressao' => '', 'recomendacao' => ''];
+        if (empty(trim($corpo))) return $secoes;
+
+        $linhas = explode("\n", $corpo);
+        $secaoAtual = 'achados'; // padrão: tudo vai para achados
+
+        $labTecnica   = ['técnica:', 'metodologia:', 'método:'];
+        $labAchados   = ['análise:', 'achados:', 'achados adicionais:'];
+        $labImpressao = ['impressão:', 'conclusão:', 'impressão diagnóstica:'];
+        $labIndicacao = ['indicação:', 'indicacao:'];
+        $labRecom     = ['recomendação:', 'recomendações:', 'recomendacao:'];
+
+        $buffer = [];
+        foreach ($linhas as $linha) {
+            $lower = mb_strtolower(trim($linha));
+            if (in_array($lower, $labTecnica))   { $secoes[$secaoAtual] = trim(implode("\n", $buffer)); $buffer = []; $secaoAtual = 'tecnica';   continue; }
+            if (in_array($lower, $labAchados))   { $secoes[$secaoAtual] = trim(implode("\n", $buffer)); $buffer = []; $secaoAtual = 'achados';   continue; }
+            if (in_array($lower, $labImpressao)) { $secoes[$secaoAtual] = trim(implode("\n", $buffer)); $buffer = []; $secaoAtual = 'impressao'; continue; }
+            if (in_array($lower, $labIndicacao)) { $secoes[$secaoAtual] = trim(implode("\n", $buffer)); $buffer = []; $secaoAtual = 'indicacao'; continue; }
+            if (in_array($lower, $labRecom))     { $secoes[$secaoAtual] = trim(implode("\n", $buffer)); $buffer = []; $secaoAtual = 'recomendacao'; continue; }
+            $buffer[] = $linha;
+        }
+        $secoes[$secaoAtual] = trim(implode("\n", $buffer));
+        return $secoes;
     }
 
     public function atualizar(int $id): void {
@@ -206,7 +266,18 @@ class TemplatesController extends Controller {
             return;
         }
 
-        echo json_encode(['ok' => true, 'corpo' => $template->corpo ?? '', 'nome' => $template->nome ?? '']);
+        // Preferir achados do estrutura_json se disponível
+        $tArr = (array) $template;
+        $estruturaJson = $tArr['estrutura_json'] ?? '';
+        if (!empty($estruturaJson) && $estruturaJson !== '{}') {
+            $est = json_decode($estruturaJson, true);
+            $achados = $est['achados'] ?? '';
+            if (!empty($achados)) {
+                echo json_encode(['ok' => true, 'corpo' => $achados, 'nome' => $tArr['nome'] ?? '', 'estrutura' => $est]);
+                return;
+            }
+        }
+        echo json_encode(['ok' => true, 'corpo' => $tArr['corpo'] ?? '', 'nome' => $tArr['nome'] ?? '']);
     }
 
     // API: buscar template por ID (AJAX)

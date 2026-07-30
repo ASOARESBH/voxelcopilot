@@ -2,7 +2,33 @@
 <?php
 $isEdicao = !is_null($template);
 $action   = $isEdicao ? '/templates/' . (is_array($template) ? $template['id'] : $template->id) . '/atualizar' : '/templates/criar';
-$estrutura = $isEdicao ? json_decode(is_array($template) ? ($template['estrutura_json'] ?? '{}') : ($template->estrutura_json ?? '{}'), true) : ['indicacao'=>'','tecnica'=>'','achados'=>'','impressao'=>'','recomendacao'=>''];
+// Nomes amigáveis para as seções padrão
+$secaoLabels = [
+    'indicacao'   => 'Indicação Clínica',
+    'tecnica'     => 'Técnica',
+    'achados'     => 'Achados',
+    'impressao'   => 'Impressão Diagnóstica',
+    'recomendacao'=> 'Recomendações',
+];
+$secaoOrdem = ['indicacao', 'tecnica', 'achados', 'impressao', 'recomendacao'];
+
+if ($isEdicao) {
+    $rawJson = is_array($template) ? ($template['estrutura_json'] ?? '{}') : ($template->estrutura_json ?? '{}');
+    $estruturaRaw = json_decode($rawJson, true) ?: [];
+    // Garantir que todas as seções padrão existam e na ordem correta
+    $estrutura = [];
+    foreach ($secaoOrdem as $chave) {
+        $estrutura[$chave] = $estruturaRaw[$chave] ?? '';
+    }
+    // Adicionar seções extras que não são padrão (criadas pelo usuário)
+    foreach ($estruturaRaw as $chave => $val) {
+        if (!isset($estrutura[$chave])) {
+            $estrutura[$chave] = $val;
+        }
+    }
+} else {
+    $estrutura = ['indicacao'=>'','tecnica'=>'','achados'=>'','impressao'=>'','recomendacao'=>''];
+}
 $nomeAtual = $isEdicao ? (is_array($template) ? $template['nome'] : $template->nome) : ($old['nome'] ?? '');
 $modAtual  = $isEdicao ? (is_array($template) ? $template['modalidade'] : $template->modalidade) : ($old['modalidade'] ?? '');
 ?>
@@ -64,14 +90,26 @@ $modAtual  = $isEdicao ? (is_array($template) ? $template['modalidade'] : $templ
         </div>
         <div id="secoesList">
           <?php foreach ($estrutura as $chave => $conteudo): ?>
-          <div class="secao-item" data-key="<?= htmlspecialchars($chave) ?>">
+          <?php
+            $labelAmigavel = $secaoLabels[$chave] ?? ucfirst(str_replace('_', ' ', $chave));
+            $rows = ($chave === 'achados') ? 12 : (($chave === 'impressao') ? 6 : 4);
+            $isPadrao = in_array($chave, $secaoOrdem);
+          ?>
+          <div class="secao-item <?= $isPadrao ? 'secao-padrao' : '' ?>" data-key="<?= htmlspecialchars($chave) ?>">
             <div class="secao-header">
-              <input type="text" class="secao-nome-input" value="<?= htmlspecialchars(ucfirst($chave)) ?>" placeholder="Nome da seção">
+              <?php if ($isPadrao): ?>
+              <span class="secao-badge"><?= htmlspecialchars($labelAmigavel) ?></span>
+              <input type="hidden" class="secao-nome-input" value="<?= htmlspecialchars($chave) ?>">
+              <?php else: ?>
+              <input type="text" class="secao-nome-input" value="<?= htmlspecialchars($labelAmigavel) ?>" placeholder="Nome da seção">
+              <?php endif; ?>
+              <?php if (!$isPadrao): ?>
               <button type="button" onclick="removerSecao(this)" class="btn-icon-danger" title="Remover seção">
                 <i class="fa-solid fa-trash"></i>
               </button>
+              <?php endif; ?>
             </div>
-            <textarea class="form-control secao-conteudo" rows="4" placeholder="Conteúdo padrão da seção (pode ficar em branco)..."><?= htmlspecialchars($conteudo) ?></textarea>
+            <textarea class="form-control secao-conteudo" rows="<?= $rows ?>" placeholder="Conteúdo padrão da seção (pode ficar em branco)..."><?= htmlspecialchars($conteudo) ?></textarea>
           </div>
           <?php endforeach; ?>
         </div>
@@ -99,6 +137,9 @@ $modAtual  = $isEdicao ? (is_array($template) ? $template['modalidade'] : $templ
 .secao-nome-input { flex:1; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px; font-size:13px; font-weight:600; color:#1e293b; background:#fff; }
 .btn-icon-danger { width:32px; height:32px; border:1px solid #fecaca; border-radius:6px; background:#fef2f2; color:#dc2626; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .secao-conteudo { font-size:13px; }
+.secao-padrao { background:#f0f7ff; border-color:#bfdbfe; }
+.secao-badge { font-size:12px; font-weight:700; color:#1a56db; background:#dbeafe; padding:3px 10px; border-radius:20px; white-space:nowrap; }
+.secao-padrao .secao-badge { flex:0 0 auto; }
 .form-footer { display:flex; justify-content:flex-end; gap:12px; padding-top:16px; border-top:1px solid #e2e8f0; }
 .required { color:#dc2626; }
 @media(max-width:768px) { .template-form-layout { grid-template-columns:1fr; } }
