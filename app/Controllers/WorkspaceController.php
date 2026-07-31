@@ -494,6 +494,213 @@ class WorkspaceController extends Controller {
             // Não bloqueia a assinatura se o perfil falhar
         }
 
+        // ── Notifica o PACS sobre o laudo assinado ──────────────────────────────
+        try {
+            $this->notificarPacsLaudoAssinado($pdo, $id, $medicoId, $tenantId);
+        } catch (\Throwable $e) {
+            // Não bloqueia a assinatura se a notificação falhar
+        }
+
         $this->json(['ok' => true, 'msg' => 'Laudo assinado com sucesso.']);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // GET /workspace/worklist
+    // Página da worklist de exames recebidos do PACS
+    // ─────────────────────────────────────────────────────────────────────────────
+    public function worklist(): void {
+        TenantMiddleware::handle();
+        $pdo      = Database::getInstance();
+        $medicoId = Auth::userId();
+
+        $itens = [];
+        try {
+            $stmt = $pdo->prepare("
+                SELECT w.*,
+                    u.nome_instituicao, u.codigo_unidade
+                FROM cop_pacs_worklist w
+                JOIN cop_pacs_autorizacoes a ON a.id = w.autorizacao_id
+                JOIN cop_pacs_unidades u ON u.id = a.unidade_id
+                WHERE w.user_id = :uid
+                  AND w.status NOT IN ('enviado')
+                ORDER BY
+                    CASE w.prioridade WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1 ELSE 2 END,
+                    w.assumido_em DESC
+                LIMIT 100
+            ");
+            $stmt->execute(['uid' => $medicoId]);
+            $itens = $stmt->fetchAll(\PDO::FETCH_OBJ);
+        } catch (\Throwable $e) {
+            // Tabela pode não existir ainda
+        }
+
+        $this->view('workspace/worklist', [
+            'title' => 'Worklist PACS',
+            'itens' => $itens,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // GET /api/pacs/worklist
+    // JSON: lista de exames pendentes do PACS para o médico logado
+    // ─────────────────────────────────────────────────────────────────────────────
+    public function apiWorklist(): void {
+        TenantMiddleware::handle();
+        $pdo      = Database::getInstance();
+        $medicoId = Auth::userId();
+
+        $itens = [];
+        try {
+            $stmt = $pdo->prepare("
+                SELECT w.id, w.study_instance_uid, w.accession_number,
+                    w.patient_nome, w.patient_id, w.modalidade,
+                    w.study_date, w.study_description, w.institution_name,
+                    w.prioridade, w.status, w.assumido_em,
+                    w.workspace_id, w.laudo_id,
+                    u.nome_instituicao, u.codigo_unidade
+                FROM cop_pacs_worklist w
+                JOIN cop_pacs_autorizacoes a ON a.id = w.autorizacao_id
+                JOIN cop_pacs_unidades u ON u.id = a.unidade_id
+                WHERE w.user_id = :uid AND w.status NOT IN ('enviado', 'erro')
+                ORDER BY
+                    CASE w.prioridade WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1 ELSE 2 END,
+                    w.assumido_em DESC
+                LIMIT 50
+            ");
+            $stmt->execute(['uid' => $medicoId]);
+            $itens = $stmt->fetchAll(\PDO::FETCH_OBJ);
+        } catch (\Throwable $e) {
+            // Silencioso
+        }
+
+        $this->json(['ok' => true, 'total' => count($itens), 'itens' => $itens]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // POST /api/pacs/worklist/{id}/finalizar
+    // Finaliza o laudo e notifica o PACS via webhook
+    // ─────────────────────────────────────────────────────────────────────────────
+    public function finalizarLaudo(int $id): void {
+        TenantMiddleware::handle();
+        $pdo      = Database::getInstance();
+        $medicoId = Auth::userId();
+
+        $stmt = $pdo->prepare("
+            SELECT w.*, a.token_integracao, a.pacs_medico_token,
+                u.pacs_webhook_url, u.pacs_api_token, u.codigo_unidade, u.chave_secreta
+            FROM cop_pacs_worklist w
+            JOIN cop_pacs_autorizacoes a ON a.id = w.autorizacao_id
+            JOIN cop_pacs_unidades u ON u.id = a.unidade_id
+            WHERE w.id = :id AND w.user_id = :uid LIMIT 1
+        ");
+        $stmt->execute(['id' => $id, 'uid' => $medicoId]);
+        $wl = $stmt->fetch(\PDO::FETCH_OBJ);
+        if (!$wl) {
+            $this->json(['ok' => false, 'msg' => 'Item não encontrado.'], 404);
+            return;
+        }
+
+        $laudoStmt = $pdo->prepare("SELECT * FROM cop_laudos WHERE id = :id AND medico_id = :mid LIMIT 1");
+        $laudoStmt->execute(['id' => $wl->laudo_id, 'mid' => $medicoId]);
+        $laudo = $laudoStmt->fetch(\PDO::FETCH_OBJ);
+
+        $resultado = $this->enviarLaudoAoPacs($wl, $laudo);
+
+        if ($resultado) {
+            $pdo->prepare("
+                UPDATE cop_pacs_worklist SET
+                    status = 'enviado', enviado_pacs_em = NOW(), updated_at = NOW()
+                WHERE id = :id
+            ")->execute(['id' => $id]);
+            $this->json(['ok' => true, 'msg' => 'Laudo enviado ao PACS com sucesso.']);
+        } else {
+            $pdo->prepare("
+                UPDATE cop_pacs_worklist SET
+                    status = 'erro', erro_msg = 'Falha ao enviar ao PACS', updated_at = NOW()
+                WHERE id = :id
+            ")->execute(['id' => $id]);
+            $this->json(['ok' => false, 'msg' => 'Falha ao notificar o PACS. O laudo foi salvo.']);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // HELPER: notifica o PACS após assinar laudo (via cop_pacs_worklist)
+    // ─────────────────────────────────────────────────────────────────────────────
+    private function notificarPacsLaudoAssinado(\PDO $pdo, int $laudoId, int $medicoId, ?int $tenantId): void {
+        $stmt = $pdo->prepare("
+            SELECT w.*, a.token_integracao, a.pacs_medico_token,
+                u.pacs_webhook_url, u.pacs_api_token, u.codigo_unidade, u.chave_secreta
+            FROM cop_pacs_worklist w
+            JOIN cop_pacs_autorizacoes a ON a.id = w.autorizacao_id
+            JOIN cop_pacs_unidades u ON u.id = a.unidade_id
+            WHERE w.laudo_id = :lid AND w.user_id = :uid AND w.status != 'enviado' LIMIT 1
+        ");
+        $stmt->execute(['lid' => $laudoId, 'uid' => $medicoId]);
+        $wl = $stmt->fetch(\PDO::FETCH_OBJ);
+        if (!$wl || !$wl->pacs_webhook_url) return;
+
+        $laudoStmt = $pdo->prepare("SELECT * FROM cop_laudos WHERE id = :id LIMIT 1");
+        $laudoStmt->execute(['id' => $laudoId]);
+        $laudo = $laudoStmt->fetch(\PDO::FETCH_OBJ);
+
+        $ok = $this->enviarLaudoAoPacs($wl, $laudo);
+        if ($ok) {
+            $pdo->prepare("
+                UPDATE cop_pacs_worklist SET
+                    status = 'enviado', enviado_pacs_em = NOW(), updated_at = NOW()
+                WHERE id = :id
+            ")->execute(['id' => $wl->id]);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // HELPER: envia o laudo ao PACS via webhook
+    // ─────────────────────────────────────────────────────────────────────────────
+    private function enviarLaudoAoPacs(object $wl, ?object $laudo): bool {
+        if (!$wl->pacs_webhook_url) return false;
+
+        $payload = [
+            'evento'             => 'laudo.finalizado',
+            'study_instance_uid' => $wl->study_instance_uid,
+            'accession_number'   => $wl->accession_number,
+            'medico_nome'        => $wl->medico_nome ?? '',
+            'medico_token'       => $wl->pacs_medico_token ?? '',
+            'laudo_html'         => $laudo ? ($laudo->achados ?? '') : '',
+            'laudo_texto'        => $laudo ? strip_tags($laudo->achados ?? '') : '',
+            'assinado_em'        => $laudo ? ($laudo->assinado_em ?? date('c')) : date('c'),
+            '_meta' => [
+                'codigo_unidade'  => $wl->codigo_unidade,
+                'copilot_version' => '2026',
+            ],
+        ];
+
+        $payloadJson = json_encode($payload, JSON_UNESCAPED_UNICODE);
+        $assinatura  = '';
+        if (!empty($wl->chave_secreta)) {
+            $assinatura = 'sha256=' . hash_hmac('sha256', $payloadJson, $wl->chave_secreta);
+        }
+
+        $url = rtrim($wl->pacs_webhook_url, '/') . '/api/copilot/webhook/laudo-finalizado';
+
+        try {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 8,
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $payloadJson,
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'X-Copilot-Signature: ' . $assinatura,
+                    'Authorization: Bearer ' . ($wl->pacs_api_token ?? ''),
+                ],
+            ]);
+            $resp   = curl_exec($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            return $status >= 200 && $status < 300;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }

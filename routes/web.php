@@ -190,6 +190,14 @@ Router::post('/api/copilot/report-engine', 'CopilotApiController@reportEngine');
 Router::post('/api/vision/analisar',      'VisionAIController@analisar');
 Router::post('/api/speech/transcrever',   'SpeechController@transcrever');
 Router::post('/api/integracoes/testar',   'IntegracoesController@testar');
+
+// ─── VOXEL PACS — Webhook (público, protegido por Bearer token) ─────────────────
+Router::post('/api/pacs/webhook/evento',           'PacsWebhookController@evento');
+
+// ─── VOXEL PACS — Worklist (exames recebidos do PACS) ──────────────────────────
+Router::get( '/workspace/worklist',                'WorkspaceController@worklist');
+Router::get( '/api/pacs/worklist',                 'WorkspaceController@apiWorklist');
+Router::post('/api/pacs/worklist/{id}/finalizar',  'WorkspaceController@finalizarLaudo');
 Router::post('/api/configuracoes/assinatura', 'ConfiguracoesController@salvarAssinatura');
 
 // ─── REDIRECT RAIZ ────────────────────────────────────────────────────────────
