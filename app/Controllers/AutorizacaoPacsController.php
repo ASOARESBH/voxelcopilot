@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Database;
+use App\Core\Logger;
 use App\Middlewares\AuthMiddleware;
 
 /**
@@ -86,7 +87,19 @@ class AutorizacaoPacsController extends Controller {
         $codigoMedico = trim($_POST['codigo_medico']    ?? '');
         $token        = trim($_POST['token_integracao'] ?? '');
 
+        Logger::pacs('INFO', '[AutorizacaoPacsController::cadastrar] Tentativa de vincular unidade PACS', [
+            'user_id'       => $userId,
+            'codigo_medico' => $codigoMedico,
+            'token_len'     => strlen($token),
+            'ip'            => $_SERVER['REMOTE_ADDR'] ?? '',
+        ]);
+
         if (!$codigoMedico || !$token) {
+            Logger::pacs('WARNING', '[AutorizacaoPacsController::cadastrar] Campos obrigatórios ausentes', [
+                'user_id' => $userId,
+                'codigo'  => $codigoMedico ?: '(vazio)',
+                'token'   => $token ? '(preenchido)' : '(vazio)',
+            ]);
             header('Location: /configuracoes?tab=autorizacao&erro=campos_obrigatorios');
             exit;
         }
@@ -102,6 +115,12 @@ class AutorizacaoPacsController extends Controller {
         $unidade = $stmt->fetch(\PDO::FETCH_OBJ);
 
         if (!$unidade) {
+            Logger::pacs('ERROR', '[AutorizacaoPacsController::cadastrar] Código de unidade NAO ENCONTRADO em cop_pacs_unidades', [
+                'user_id'       => $userId,
+                'codigo_medico' => $codigoMedico,
+                'ip'            => $_SERVER['REMOTE_ADDR'] ?? '',
+                'causa'         => 'O codigo gerado pelo VoxelPACS (bi_copilot_unidades) precisa ser cadastrado manualmente em cop_pacs_unidades do Copilot, OU o webhook do PACS precisa criar a unidade automaticamente',
+            ]);
             header('Location: /configuracoes?tab=autorizacao&erro=unidade_nao_encontrada');
             exit;
         }
