@@ -165,7 +165,7 @@ $buscaAtiva   = $busca ?? '';
     <div class="table-wrap">
         <table class="table">
             <thead>
-                <tr data-template-id="<?= $tid ?>">
+                <tr>
                     <th>Nome</th>
                     <th>Modalidade</th>
                     <th>Origem</th>
