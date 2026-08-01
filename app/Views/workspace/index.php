@@ -11,12 +11,195 @@ $statusMap = [
         <h1>Workspace de Laudos</h1>
         <p><?= number_format($total) ?> laudo(s) encontrado(s)</p>
     </div>
-    <div class="page-header-actions">
+    <div class="page-header-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <?php if (!empty($pacsWorklist) || isset($pacsUnitName)): ?>
+        <button id="btn-sincronizar-pacs" onclick="pacsSync()" class="btn" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;display:flex;align-items:center;gap:6px;">
+            <i class="fa-solid fa-rotate" id="pacs-sync-icon"></i> Sincronizar com VoxelPACS
+        </button>
+        <?php endif; ?>
         <a href="/workspace/novo" class="btn btn-primary">
             <i class="fa-solid fa-plus"></i> Novo Laudo
         </a>
     </div>
 </div>
+
+<?php if (isset($pacsWorklist)): ?>
+<!-- ═══ WORKLIST PACS ═══════════════════════════════════════════════════════ -->
+<div class="card" style="margin-bottom:20px;border:1px solid rgba(99,102,241,.25);" id="pacs-worklist-card">
+    <div class="card-body" style="padding:0;">
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;
+                    background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.06));
+                    border-bottom:1px solid rgba(99,102,241,.15);border-radius:8px 8px 0 0;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+                            border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                    <i class="fa-solid fa-hospital" style="color:#fff;font-size:.8rem;"></i>
+                </div>
+                <div>
+                    <div style="font-weight:700;font-size:.9rem;color:#e2e8f0;">Worklist PACS</div>
+                    <div style="font-size:.7rem;color:var(--muted);">
+                        <?php if ($pacsUnitName): ?>
+                            <?= htmlspecialchars($pacsUnitName) ?> &mdash;
+                        <?php endif; ?>
+                        <span id="pacs-count"><?= $pacsTotal ?></span> exame(s) aguardando laudo
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span id="pacs-last-sync" style="font-size:.68rem;color:var(--muted);">
+                    Atualizado: <?= date('H:i:s') ?>
+                </span>
+                <div style="width:8px;height:8px;background:#22c55e;border-radius:50%;" id="pacs-status-dot" title="Sincronizado"></div>
+            </div>
+        </div>
+
+        <!-- Tabela -->
+        <div id="pacs-worklist-body">
+        <?php if (empty($pacsWorklist)): ?>
+        <div style="padding:28px;text-align:center;color:var(--muted);">
+            <i class="fa-solid fa-inbox" style="font-size:2rem;margin-bottom:8px;display:block;opacity:.4;"></i>
+            <div style="font-size:.85rem;">Nenhum exame assumido no VoxelPACS no momento.</div>
+            <div style="font-size:.75rem;margin-top:4px;">Quando você assumir um exame no PACS, ele aparecerá aqui automaticamente.</div>
+        </div>
+        <?php else: ?>
+        <div style="overflow-x:auto;">
+        <table class="table" style="margin:0;">
+            <thead>
+                <tr>
+                    <th style="font-size:.72rem;">Paciente</th>
+                    <th style="font-size:.72rem;">Modalidade</th>
+                    <th style="font-size:.72rem;">Unidade</th>
+                    <th style="font-size:.72rem;">Data Estudo</th>
+                    <th style="font-size:.72rem;">Status</th>
+                    <th style="font-size:.72rem;">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php
+            $pacsStatusMap = [
+                'pendente'        => ['#f59e0b','Aguardando'],
+                'enviado_copilot' => ['#6366f1','Assumido'],
+                'em_laudo'        => ['#0ea5e9','Em Laudo'],
+                'rascunho'        => ['#8b5cf6','Rascunho'],
+                'assinado'        => ['#22c55e','Assinado'],
+                'erro'            => ['#ef4444','Erro'],
+            ];
+            foreach ($pacsWorklist as $pw):
+                $st = $pw->status_copilot ?? $pw['status_copilot'] ?? 'pendente';
+                [$stColor, $stLabel] = $pacsStatusMap[$st] ?? ['#6b7280','Desconhecido'];
+                $pName = $pw->patient_name ?? $pw['patient_name'] ?? 'Não identificado';
+                $pMods = $pw->modalities   ?? $pw['modalities']   ?? '';
+                $pInst = $pw->institution_name ?? $pw['institution_name'] ?? '';
+                $pDate = $pw->study_date   ?? $pw['study_date']   ?? '';
+                $pUid  = $pw->study_instance_uid ?? $pw['study_instance_uid'] ?? '';
+                $pLaudo= $pw->laudo_id     ?? $pw['laudo_id']     ?? null;
+                $pwId  = $pw->id           ?? $pw['id']           ?? 0;
+            ?>
+            <tr>
+                <td>
+                    <div style="font-weight:600;font-size:.82rem;color:#e2e8f0;"><?= htmlspecialchars($pName) ?></div>
+                    <div style="font-size:.68rem;color:var(--muted);font-family:monospace;"><?= htmlspecialchars(substr($pUid, 0, 24)) ?>...</div>
+                </td>
+                <td>
+                    <?php foreach (explode('\\', $pMods) as $m): $m = trim($m); if (!$m) continue; ?>
+                    <span style="background:rgba(14,165,233,.1);border:1px solid rgba(14,165,233,.2);color:#38bdf8;
+                                 padding:2px 8px;border-radius:100px;font-size:.68rem;font-weight:700;margin-right:2px;">
+                        <?= htmlspecialchars($m) ?>
+                    </span>
+                    <?php endforeach; ?>
+                </td>
+                <td style="font-size:.75rem;color:var(--muted);"><?= htmlspecialchars($pInst) ?></td>
+                <td style="font-size:.75rem;color:var(--muted);">
+                    <?= $pDate ? date('d/m/Y', strtotime($pDate)) : '—' ?>
+                </td>
+                <td>
+                    <span style="background:<?= $stColor ?>22;border:1px solid <?= $stColor ?>44;color:<?= $stColor ?>;
+                                 padding:2px 10px;border-radius:100px;font-size:.7rem;font-weight:700;">
+                        <?= $stLabel ?>
+                    </span>
+                </td>
+                <td>
+                    <?php if ($pLaudo): ?>
+                    <a href="/workspace/<?= (int)$pLaudo ?>" class="btn btn-ghost btn-xs" style="margin-right:4px;">
+                        <i class="fa-solid fa-pen"></i> Laudar
+                    </a>
+                    <?php else: ?>
+                    <button onclick="pacsAbrirViewer('<?= htmlspecialchars($pUid) ?>', <?= (int)$pwId ?>)"
+                            class="btn btn-ghost btn-xs" style="margin-right:4px;">
+                        <i class="fa-solid fa-eye"></i> Abrir
+                    </button>
+                    <?php endif; ?>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        </div>
+        <?php endif; ?>
+        </div><!-- /#pacs-worklist-body -->
+    </div>
+</div>
+
+<script>
+// ── Worklist PACS: auto-refresh 60s + botão Sincronizar ──────────────────
+let pacsAutoTimer = setInterval(pacsSync, 60000);
+
+function pacsSync() {
+    const icon = document.getElementById('pacs-sync-icon');
+    const dot  = document.getElementById('pacs-status-dot');
+    if (icon) icon.classList.add('fa-spin');
+    if (dot)  dot.style.background = '#f59e0b';
+
+    fetch('/api/workspace/worklist', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            const countEl = document.getElementById('pacs-count');
+            if (countEl) countEl.textContent = data.total;
+
+            // Atualiza o corpo da tabela
+            const body = document.getElementById('pacs-worklist-body');
+            if (body && data.html) {
+                body.innerHTML = data.html;
+            } else if (body && data.itens !== undefined) {
+                if (data.itens.length === 0) {
+                    body.innerHTML = '<div style="padding:28px;text-align:center;color:var(--muted);">' +
+                        '<i class="fa-solid fa-inbox" style="font-size:2rem;margin-bottom:8px;display:block;opacity:.4;"></i>' +
+                        '<div style="font-size:.85rem;">Nenhum exame assumido no VoxelPACS no momento.</div></div>';
+                }
+            }
+
+            const ts = document.getElementById('pacs-last-sync');
+            if (ts) ts.textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
+            if (dot) dot.style.background = '#22c55e';
+        } else {
+            if (dot) dot.style.background = '#ef4444';
+        }
+    })
+    .catch(() => { if (dot) dot.style.background = '#ef4444'; })
+    .finally(() => { if (icon) icon.classList.remove('fa-spin'); });
+}
+
+function pacsAbrirViewer(studyUid, worklistId) {
+    fetch('/api/workspace/viewer-url?study_uid=' + encodeURIComponent(studyUid), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok && data.url) {
+            window.open(data.url, '_blank');
+        } else {
+            alert('Não foi possível obter a URL do viewer. Verifique a configuração do PACS.');
+        }
+    })
+    .catch(() => alert('Erro ao conectar ao servidor.'));
+}
+
+window.addEventListener('beforeunload', () => clearInterval(pacsAutoTimer));
+</script>
+<?php endif; ?>
+<!-- ═══ FIM WORKLIST PACS ═══════════════════════════════════════════════════ -->
 
 <!-- Filtros -->
 <div class="card" style="margin-bottom:20px;">

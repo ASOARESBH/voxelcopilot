@@ -65,6 +65,41 @@ class WorkspaceController extends Controller {
         $stmt->execute($params);
         $laudos = $stmt->fetchAll();
 
+        // ── Worklist PACS: exames assumidos pelo médico vinculado ──────────────
+        $pacsWorklist  = [];
+        $pacsTotal     = 0;
+        $pacsUnitName  = null;
+        try {
+            $authStmt = $pdo->prepare("
+                SELECT a.id, u.codigo_unidade, u.nome_instituicao, u.pacs_tipo
+                FROM cop_pacs_autorizacoes a
+                JOIN cop_pacs_unidades u ON u.id = a.unidade_id
+                WHERE a.medico_user_id = :uid AND a.status = 'ativo'
+                LIMIT 1
+            ");
+            $authStmt->execute(['uid' => $medicoId]);
+            $pacsAuth = $authStmt->fetch();
+            if ($pacsAuth) {
+                $pacsUnitName = $pacsAuth->nome_instituicao ?? $pacsAuth->codigo_unidade;
+                $wStmt = $pdo->prepare("
+                    SELECT w.id, w.study_instance_uid, w.patient_name, w.patient_id,
+                           w.modalities, w.study_date, w.study_description,
+                           w.institution_name, w.status_copilot, w.laudo_id,
+                           w.assumido_em, w.created_at
+                    FROM cop_pacs_worklist w
+                    WHERE w.medico_user_id = :uid
+                      AND w.status_copilot NOT IN ('assinado','cancelado')
+                    ORDER BY w.assumido_em DESC
+                    LIMIT 50
+                ");
+                $wStmt->execute(['uid' => $medicoId]);
+                $pacsWorklist = $wStmt->fetchAll();
+                $pacsTotal    = count($pacsWorklist);
+            }
+        } catch (\Throwable $e) {
+            // Tabela pode não existir ainda — silencia
+        }
+
         $this->view('workspace/index', [
             'title'        => 'Laudos — VOXEL Copilot',
             'pageTitle'    => 'Workspace de Laudos',
@@ -76,6 +111,9 @@ class WorkspaceController extends Controller {
             'totalPages'   => (int) ceil($total / $perPage),
             'status'       => $status,
             'busca'        => $busca,
+            'pacsWorklist' => $pacsWorklist,
+            'pacsTotal'    => $pacsTotal,
+            'pacsUnitName' => $pacsUnitName,
         ]);
     }
 
