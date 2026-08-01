@@ -350,6 +350,160 @@ class AutorizacaoPacsController extends Controller {
     }
 
     // ─────────────────────────────────────────────────────────
+    //  API: REGISTRAR UNIDADE — POST /api/pacs/registrar-unidade
+    //  Chamado automaticamente pelo VoxelPACS ao gerar um token.
+    //  Cria ou atualiza a entrada em cop_pacs_unidades para que
+    //  o médico possa vincular usando o código gerado pelo PACS.
+    // ─────────────────────────────────────────────────────────
+    public function apiRegistrarUnidade(): void {
+        header('Content-Type: application/json; charset=utf-8');
+
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        $pdo  = Database::getInstance();
+
+        // Campos obrigatórios
+        $codigoUnidade = trim($body['codigo_unidade'] ?? '');
+        $chaveSecreta  = trim($body['chave_secreta']  ?? '');
+
+        Logger::pacs('INFO', '[AutorizacaoPacsController::apiRegistrarUnidade] Recebida requisição de registro', [
+            'codigo_unidade'  => $codigoUnidade,
+            'chave_len'       => strlen($chaveSecreta),
+            'ip'              => $_SERVER['REMOTE_ADDR'] ?? '',
+            'payload_keys'    => array_keys($body),
+        ]);
+
+        if (!$codigoUnidade || !$chaveSecreta) {
+            Logger::pacs('ERROR', '[AutorizacaoPacsController::apiRegistrarUnidade] Campos obrigatórios ausentes', [
+                'codigo_unidade' => $codigoUnidade ?: '(vazio)',
+                'chave_secreta'  => $chaveSecreta  ? '(preenchido)' : '(vazio)',
+            ]);
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'erro' => 'codigo_unidade e chave_secreta são obrigatórios']);
+            exit;
+        }
+
+        // Dados opcionais da unidade
+        $nomeInstituicao = trim($body['nome_instituicao'] ?? '');
+        $cnpj            = preg_replace('/\D/', '', $body['cnpj'] ?? '');
+        $cidade          = trim($body['cidade']           ?? '');
+        $estado          = strtoupper(trim($body['estado'] ?? ''));
+        $telefone        = trim($body['telefone']         ?? '');
+        $emailContato    = trim($body['email_contato']    ?? '');
+        $pacsWebhookUrl  = trim($body['pacs_webhook_url'] ?? '');
+        $pacsApiToken    = trim($body['pacs_api_token']   ?? '');
+        $pacsTipo        = trim($body['pacs_tipo']        ?? 'VoxelPACS');
+
+        try {
+            // Verifica se já existe
+            $stmt = $pdo->prepare("
+                SELECT id FROM cop_pacs_unidades
+                WHERE codigo_unidade = :codigo LIMIT 1
+            ");
+            $stmt->execute(['codigo' => $codigoUnidade]);
+            $existente = $stmt->fetchColumn();
+
+            if ($existente) {
+                // Atualiza dados se a unidade já foi registrada
+                $pdo->prepare("
+                    UPDATE cop_pacs_unidades SET
+                        chave_secreta    = :chave,
+                        nome_instituicao = COALESCE(NULLIF(:nome,''), nome_instituicao),
+                        cnpj             = COALESCE(NULLIF(:cnpj,''), cnpj),
+                        cidade           = COALESCE(NULLIF(:cidade,''), cidade),
+                        estado           = COALESCE(NULLIF(:estado,''), estado),
+                        telefone         = COALESCE(NULLIF(:tel,''), telefone),
+                        email_contato    = COALESCE(NULLIF(:email,''), email_contato),
+                        pacs_webhook_url = COALESCE(NULLIF(:webhook,''), pacs_webhook_url),
+                        pacs_api_token   = COALESCE(NULLIF(:api_token,''), pacs_api_token),
+                        pacs_tipo        = COALESCE(NULLIF(:tipo,''), pacs_tipo),
+                        updated_at       = NOW()
+                    WHERE codigo_unidade = :codigo
+                ")->execute([
+                    'chave'     => $chaveSecreta,
+                    'nome'      => $nomeInstituicao,
+                    'cnpj'      => $cnpj,
+                    'cidade'    => $cidade,
+                    'estado'    => $estado,
+                    'tel'       => $telefone,
+                    'email'     => $emailContato,
+                    'webhook'   => $pacsWebhookUrl,
+                    'api_token' => $pacsApiToken,
+                    'tipo'      => $pacsTipo,
+                    'codigo'    => $codigoUnidade,
+                ]);
+
+                Logger::pacs('INFO', '[AutorizacaoPacsController::apiRegistrarUnidade] Unidade atualizada', [
+                    'unidade_id'     => $existente,
+                    'codigo_unidade' => $codigoUnidade,
+                ]);
+
+                echo json_encode([
+                    'ok'             => true,
+                    'acao'           => 'atualizada',
+                    'codigo_unidade' => $codigoUnidade,
+                    'unidade_id'     => (int)$existente,
+                ]);
+                exit;
+            }
+
+            // Cria nova entrada
+            $pdo->prepare("
+                INSERT INTO cop_pacs_unidades
+                    (codigo_unidade, chave_secreta, nome_instituicao, cnpj,
+                     cidade, estado, telefone, email_contato,
+                     pacs_webhook_url, pacs_api_token, pacs_tipo,
+                     status, created_at, updated_at)
+                VALUES
+                    (:codigo, :chave, :nome, :cnpj,
+                     :cidade, :estado, :tel, :email,
+                     :webhook, :api_token, :tipo,
+                     'pendente', NOW(), NOW())
+            ")->execute([
+                'codigo'    => $codigoUnidade,
+                'chave'     => $chaveSecreta,
+                'nome'      => $nomeInstituicao ?: null,
+                'cnpj'      => $cnpj            ?: null,
+                'cidade'    => $cidade          ?: null,
+                'estado'    => $estado          ?: null,
+                'tel'       => $telefone        ?: null,
+                'email'     => $emailContato    ?: null,
+                'webhook'   => $pacsWebhookUrl  ?: null,
+                'api_token' => $pacsApiToken    ?: null,
+                'tipo'      => $pacsTipo,
+            ]);
+
+            $novaId = (int) $pdo->lastInsertId();
+
+            Logger::pacs('INFO', '[AutorizacaoPacsController::apiRegistrarUnidade] Nova unidade criada em cop_pacs_unidades', [
+                'unidade_id'     => $novaId,
+                'codigo_unidade' => $codigoUnidade,
+                'nome'           => $nomeInstituicao,
+                'status'         => 'pendente',
+            ]);
+
+            echo json_encode([
+                'ok'             => true,
+                'acao'           => 'criada',
+                'codigo_unidade' => $codigoUnidade,
+                'unidade_id'     => $novaId,
+                'status'         => 'pendente',
+                'msg'            => 'Unidade registrada. O médico já pode vincular usando o código e token.',
+            ]);
+            exit;
+
+        } catch (\Throwable $e) {
+            Logger::pacs('ERROR', '[AutorizacaoPacsController::apiRegistrarUnidade] Erro ao registrar unidade', [
+                'codigo_unidade' => $codigoUnidade,
+                'erro'           => $e->getMessage(),
+                'arquivo'        => $e->getFile() . ':' . $e->getLine(),
+            ]);
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'erro' => 'Erro interno: ' . $e->getMessage()]);
+            exit;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
     //  HELPERS PRIVADOS
     // ─────────────────────────────────────────────────────────
 

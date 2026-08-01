@@ -98,6 +98,7 @@ Router::post('/configuracoes/autorizacao/cadastrar', 'AutorizacaoPacsController@
 Router::post('/configuracoes/autorizacao/revogar',   'AutorizacaoPacsController@revogar');
 Router::get( '/configuracoes/autorizacao/{id}',      'AutorizacaoPacsController@detalhe');
 Router::post('/api/pacs/validar-token',              'AutorizacaoPacsController@apiValidarToken');
+Router::post('/api/pacs/registrar-unidade',          'AutorizacaoPacsController@apiRegistrarUnidade');
 
 // ─── AUTOTEXTOS ───────────────────────────────────────────────────────────────
 Router::get('/autotextos',           'AutotextosController@index');
