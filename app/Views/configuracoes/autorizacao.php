@@ -217,23 +217,23 @@
             <!-- Instituição -->
             <td>
               <div style="font-weight:600;color:var(--gray-800);font-size:.84rem;">
-                <?= htmlspecialchars($a->nome_instituicao) ?>
+                <?= htmlspecialchars($a->nome_instituicao ?? '') ?>
               </div>
               <div style="font-size:.72rem;color:var(--muted);margin-top:2px;font-family:monospace;">
                 <i class="fa-solid fa-qrcode" style="font-size:.65rem;"></i>
-                <?= htmlspecialchars($a->codigo_unidade) ?>
+                <?= htmlspecialchars($a->codigo_unidade ?? '') ?>
               </div>
             </td>
 
             <!-- CNPJ -->
             <td style="font-size:.78rem;font-family:'Courier New',monospace;color:var(--gray-600);letter-spacing:.03em;">
-              <?= htmlspecialchars($a->cnpj) ?>
+              <?= htmlspecialchars($a->cnpj ?? '') ?>
             </td>
 
             <!-- Cidade / Estado -->
             <td style="font-size:.82rem;color:var(--text-2);">
               <i class="fa-solid fa-location-dot" style="color:var(--muted);font-size:.72rem;margin-right:3px;"></i>
-              <?= htmlspecialchars($a->cidade) ?>/<?= htmlspecialchars($a->estado) ?>
+              <?= htmlspecialchars($a->cidade ?? '') ?>/<?= htmlspecialchars($a->estado ?? '') ?>
             </td>
 
             <!-- PACS -->
