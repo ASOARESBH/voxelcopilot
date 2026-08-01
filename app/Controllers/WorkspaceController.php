@@ -656,6 +656,54 @@ class WorkspaceController extends Controller {
     // ─────────────────────────────────────────────────────────────────────────────
     // HELPER: envia o laudo ao PACS via webhook
     // ─────────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────────
+    // GET /api/pacs/viewer-url?study_uid=...
+    // Retorna a URL do viewer PACS para abrir as imagens de um estudo
+    // ─────────────────────────────────────────────────────────────────────────────
+    public function apiViewerUrl(): void {
+        TenantMiddleware::handle();
+        $pdo      = Database::getInstance();
+        $medicoId = Auth::userId();
+        $studyUid = trim($_GET['study_uid'] ?? '');
+
+        if (!$studyUid) {
+            $this->json(['ok' => false, 'url' => null, 'msg' => 'study_uid obrigatório']);
+            return;
+        }
+
+        try {
+            // Busca a URL base do PACS vinculado ao médico
+            $stmt = $pdo->prepare("
+                SELECT u.pacs_viewer_url, u.pacs_webhook_url, u.codigo_unidade
+                FROM cop_pacs_worklist w
+                JOIN cop_pacs_autorizacoes a ON a.id = w.autorizacao_id
+                JOIN cop_pacs_unidades u ON u.id = a.unidade_id
+                WHERE w.user_id = :uid AND w.study_instance_uid = :uid2 LIMIT 1
+            ");
+            $stmt->execute(['uid' => $medicoId, 'uid2' => $studyUid]);
+            $row = $stmt->fetch(\PDO::FETCH_OBJ);
+
+            if ($row) {
+                // Usa pacs_viewer_url se disponível, senão deriva do pacs_webhook_url
+                $baseUrl = $row->pacs_viewer_url ?? null;
+                if (!$baseUrl && $row->pacs_webhook_url) {
+                    $parsed  = parse_url($row->pacs_webhook_url);
+                    $baseUrl = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
+                    if (!empty($parsed['port'])) $baseUrl .= ':' . $parsed['port'];
+                }
+                if ($baseUrl) {
+                    $viewerUrl = rtrim($baseUrl, '/') . '/viewer?StudyInstanceUID=' . urlencode($studyUid);
+                    $this->json(['ok' => true, 'url' => $viewerUrl]);
+                    return;
+                }
+            }
+        } catch (\Throwable $e) {
+            \App\Core\Logger::error('[WorkspaceController::apiViewerUrl] ' . $e->getMessage());
+        }
+
+        $this->json(['ok' => false, 'url' => null, 'msg' => 'URL do viewer não configurada.']);
+    }
+
     private function enviarLaudoAoPacs(object $wl, ?object $laudo): bool {
         if (!$wl->pacs_webhook_url) return false;
 

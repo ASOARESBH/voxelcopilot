@@ -199,6 +199,7 @@ Router::post('/api/pacs/webhook/evento',           'PacsWebhookController@evento
 Router::get( '/workspace/worklist',                'WorkspaceController@worklist');
 Router::get( '/api/pacs/worklist',                 'WorkspaceController@apiWorklist');
 Router::post('/api/pacs/worklist/{id}/finalizar',  'WorkspaceController@finalizarLaudo');
+Router::get( '/api/pacs/viewer-url',                 'WorkspaceController@apiViewerUrl');
 Router::post('/api/configuracoes/assinatura', 'ConfiguracoesController@salvarAssinatura');
 
 // ─── REDIRECT RAIZ ────────────────────────────────────────────────────────────
