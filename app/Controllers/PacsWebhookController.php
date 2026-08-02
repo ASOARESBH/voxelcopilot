@@ -300,12 +300,16 @@ class PacsWebhookController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Valida o Bearer token contra cop_pacs_autorizacoes.
+     * Valida o Bearer token.
+     * Aceita dois tipos:
+     *   1. token_integracao de cop_pacs_autorizacoes (token individual do médico)
+     *   2. pacs_api_token de cop_pacs_unidades (token da unidade enviado pelo PACS)
      * Retorna o objeto de autorização ou null.
      */
     private function validarToken(\PDO $pdo, string $token): ?\stdClass
     {
         try {
+            // Tenta primeiro pelo token individual do médico
             $stmt = $pdo->prepare("
                 SELECT
                     a.id, a.unidade_id, a.medico_user_id, a.status,
@@ -320,9 +324,41 @@ class PacsWebhookController extends Controller
             ");
             $stmt->execute(['tok' => $token]);
             $auth = $stmt->fetch(\PDO::FETCH_OBJ);
-            if (!$auth) return null;
-            if ($auth->token_expira_em && strtotime($auth->token_expira_em) < time()) return null;
-            return $auth;
+            if ($auth) {
+                if ($auth->token_expira_em && strtotime($auth->token_expira_em) < time()) return null;
+                return $auth;
+            }
+            // Fallback: token da unidade (copilot_api_token em cop_pacs_unidades)
+            // Gerado pelo Copilot e retornado ao PACS no registro da unidade.
+            // Neste caso, o medico_user_id é o primeiro médico ativo da unidade
+            $stmtU = $pdo->prepare("
+                SELECT
+                    a.id, a.unidade_id, a.medico_user_id, a.status,
+                    a.token_expira_em, a.modalidades_permitidas,
+                    a.medico_nome, a.medico_crm, a.medico_crm_uf,
+                    u.codigo_unidade, u.chave_secreta,
+                    COALESCE(a.tenant_id, u.tenant_id) AS tenant_id
+                FROM cop_pacs_unidades u
+                JOIN cop_pacs_autorizacoes a ON a.unidade_id = u.id AND a.status = 'ativo'
+                WHERE u.copilot_api_token = :tok
+                ORDER BY a.id ASC
+                LIMIT 1
+            ");
+            $stmtU->execute(['tok' => $token]);
+            $authU = $stmtU->fetch(\PDO::FETCH_OBJ);
+            if ($authU) {
+                if ($authU->token_expira_em && strtotime($authU->token_expira_em) < time()) return null;
+                Logger::info('[PacsWebhookController::validarToken] Autenticado via copilot_api_token da unidade', [
+                    'unidade_id'     => $authU->unidade_id,
+                    'codigo_unidade' => $authU->codigo_unidade,
+                    'medico_user_id' => $authU->medico_user_id,
+                ]);
+                return $authU;
+            }
+            Logger::error('[PacsWebhookController::validarToken] Token não encontrado em nenhuma tabela', [
+                'token_prefix' => substr($token, 0, 12) . '...',
+            ]);
+            return null;
         } catch (\Throwable $e) {
             Logger::error('[PacsWebhookController::validarToken] ' . $e->getMessage());
             return null;

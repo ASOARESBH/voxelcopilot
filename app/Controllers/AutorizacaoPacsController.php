@@ -396,52 +396,63 @@ class AutorizacaoPacsController extends Controller {
         try {
             // Verifica se já existe
             $stmt = $pdo->prepare("
-                SELECT id FROM cop_pacs_unidades
+                SELECT id, copilot_api_token FROM cop_pacs_unidades
                 WHERE codigo_unidade = :codigo LIMIT 1
             ");
             $stmt->execute(['codigo' => $codigoUnidade]);
-            $existente = $stmt->fetchColumn();
+            $existente = $stmt->fetch(\PDO::FETCH_OBJ);
+            $existenteId = $existente ? (int)$existente->id : null;
 
-            if ($existente) {
+            // Gera ou reutiliza o copilot_api_token (token que o PACS usa no Bearer)
+            // Este token é gerado pelo Copilot e retornado ao PACS para autenticar webhooks
+            $copilotApiToken = ($existente && $existente->copilot_api_token)
+                ? $existente->copilot_api_token
+                : 'COPILOT-' . strtoupper(bin2hex(random_bytes(20)));
+
+            if ($existenteId) {
                 // Atualiza dados se a unidade já foi registrada
                 $pdo->prepare("
                     UPDATE cop_pacs_unidades SET
-                        chave_secreta    = :chave,
-                        nome_instituicao = COALESCE(NULLIF(:nome,''), nome_instituicao),
-                        cnpj             = COALESCE(NULLIF(:cnpj,''), cnpj),
-                        cidade           = COALESCE(NULLIF(:cidade,''), cidade),
-                        estado           = COALESCE(NULLIF(:estado,''), estado),
-                        telefone         = COALESCE(NULLIF(:tel,''), telefone),
-                        email_contato    = COALESCE(NULLIF(:email,''), email_contato),
-                        pacs_webhook_url = COALESCE(NULLIF(:webhook,''), pacs_webhook_url),
-                        pacs_api_token   = COALESCE(NULLIF(:api_token,''), pacs_api_token),
-                        pacs_tipo        = COALESCE(NULLIF(:tipo,''), pacs_tipo),
-                        updated_at       = NOW()
+                        chave_secreta      = :chave,
+                        nome_instituicao   = COALESCE(NULLIF(:nome,''), nome_instituicao),
+                        cnpj               = COALESCE(NULLIF(:cnpj,''), cnpj),
+                        cidade             = COALESCE(NULLIF(:cidade,''), cidade),
+                        estado             = COALESCE(NULLIF(:estado,''), estado),
+                        telefone           = COALESCE(NULLIF(:tel,''), telefone),
+                        email_contato      = COALESCE(NULLIF(:email,''), email_contato),
+                        pacs_webhook_url   = COALESCE(NULLIF(:webhook,''), pacs_webhook_url),
+                        pacs_api_token     = COALESCE(NULLIF(:api_token,''), pacs_api_token),
+                        pacs_tipo          = COALESCE(NULLIF(:tipo,''), pacs_tipo),
+                        copilot_api_token  = :copilot_token,
+                        updated_at         = NOW()
                     WHERE codigo_unidade = :codigo
                 ")->execute([
-                    'chave'     => $chaveSecreta,
-                    'nome'      => $nomeInstituicao,
-                    'cnpj'      => $cnpj,
-                    'cidade'    => $cidade,
-                    'estado'    => $estado,
-                    'tel'       => $telefone,
-                    'email'     => $emailContato,
-                    'webhook'   => $pacsWebhookUrl,
-                    'api_token' => $pacsApiToken,
-                    'tipo'      => $pacsTipo,
-                    'codigo'    => $codigoUnidade,
+                    'chave'          => $chaveSecreta,
+                    'nome'           => $nomeInstituicao,
+                    'cnpj'           => $cnpj,
+                    'cidade'         => $cidade,
+                    'estado'         => $estado,
+                    'tel'            => $telefone,
+                    'email'          => $emailContato,
+                    'webhook'        => $pacsWebhookUrl,
+                    'api_token'      => $pacsApiToken,
+                    'tipo'           => $pacsTipo,
+                    'copilot_token'  => $copilotApiToken,
+                    'codigo'         => $codigoUnidade,
                 ]);
 
                 Logger::pacs('INFO', '[AutorizacaoPacsController::apiRegistrarUnidade] Unidade atualizada', [
-                    'unidade_id'     => $existente,
+                    'unidade_id'     => $existenteId,
                     'codigo_unidade' => $codigoUnidade,
                 ]);
 
                 echo json_encode([
-                    'ok'             => true,
-                    'acao'           => 'atualizada',
-                    'codigo_unidade' => $codigoUnidade,
-                    'unidade_id'     => (int)$existente,
+                    'ok'               => true,
+                    'acao'             => 'atualizada',
+                    'codigo_unidade'   => $codigoUnidade,
+                    'unidade_id'       => $existenteId,
+                    'copilot_api_token'=> $copilotApiToken,
+                    'msg'              => 'Use copilot_api_token como Bearer em todos os webhooks enviados ao Copilot.',
                 ]);
                 exit;
             }
@@ -452,24 +463,27 @@ class AutorizacaoPacsController extends Controller {
                     (codigo_unidade, chave_secreta, nome_instituicao, cnpj,
                      cidade, estado, telefone, email_contato,
                      pacs_webhook_url, pacs_api_token, pacs_tipo,
+                     copilot_api_token,
                      status, created_at, updated_at)
                 VALUES
                     (:codigo, :chave, :nome, :cnpj,
                      :cidade, :estado, :tel, :email,
                      :webhook, :api_token, :tipo,
+                     :copilot_token,
                      'pendente', NOW(), NOW())
             ")->execute([
-                'codigo'    => $codigoUnidade,
-                'chave'     => $chaveSecreta,
-                'nome'      => $nomeInstituicao ?: null,
-                'cnpj'      => $cnpj            ?: null,
-                'cidade'    => $cidade          ?: null,
-                'estado'    => $estado          ?: null,
-                'tel'       => $telefone        ?: null,
-                'email'     => $emailContato    ?: null,
-                'webhook'   => $pacsWebhookUrl  ?: null,
-                'api_token' => $pacsApiToken    ?: null,
-                'tipo'      => $pacsTipo,
+                'codigo'         => $codigoUnidade,
+                'chave'          => $chaveSecreta,
+                'nome'           => $nomeInstituicao ?: null,
+                'cnpj'           => $cnpj            ?: null,
+                'cidade'         => $cidade          ?: null,
+                'estado'         => $estado          ?: null,
+                'tel'            => $telefone        ?: null,
+                'email'          => $emailContato    ?: null,
+                'webhook'        => $pacsWebhookUrl  ?: null,
+                'api_token'      => $pacsApiToken    ?: null,
+                'tipo'           => $pacsTipo,
+                'copilot_token'  => $copilotApiToken,
             ]);
 
             $novaId = (int) $pdo->lastInsertId();
@@ -482,12 +496,13 @@ class AutorizacaoPacsController extends Controller {
             ]);
 
             echo json_encode([
-                'ok'             => true,
-                'acao'           => 'criada',
-                'codigo_unidade' => $codigoUnidade,
-                'unidade_id'     => $novaId,
-                'status'         => 'pendente',
-                'msg'            => 'Unidade registrada. O médico já pode vincular usando o código e token.',
+                'ok'               => true,
+                'acao'             => 'criada',
+                'codigo_unidade'   => $codigoUnidade,
+                'unidade_id'       => $novaId,
+                'status'           => 'pendente',
+                'copilot_api_token'=> $copilotApiToken,
+                'msg'              => 'Unidade registrada. Use copilot_api_token como Bearer em todos os webhooks enviados ao Copilot.',
             ]);
             exit;
 

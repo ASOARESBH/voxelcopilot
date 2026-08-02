@@ -78,15 +78,15 @@ $statusMap = [
             <tbody>
             <?php
             $pacsStatusMap = [
-                'pendente'        => ['#f59e0b','Aguardando'],
-                'enviado_copilot' => ['#6366f1','Assumido'],
+                'aguardando'      => ['#f59e0b','Aguardando'],
                 'em_laudo'        => ['#0ea5e9','Em Laudo'],
                 'rascunho'        => ['#8b5cf6','Rascunho'],
                 'assinado'        => ['#22c55e','Assinado'],
+                'enviado'         => ['#10b981','Enviado'],
                 'erro'            => ['#ef4444','Erro'],
             ];
             foreach ($pacsWorklist as $pw):
-                $st = $pw->status_copilot ?? $pw['status_copilot'] ?? 'pendente';
+                $st = $pw->status_copilot ?? $pw['status_copilot'] ?? 'aguardando';
                 [$stColor, $stLabel] = $pacsStatusMap[$st] ?? ['#6b7280','Desconhecido'];
                 $pName = $pw->patient_name ?? $pw['patient_name'] ?? 'Não identificado';
                 $pMods = $pw->modalities   ?? $pw['modalities']   ?? '';
@@ -151,22 +151,63 @@ function pacsSync() {
     if (icon) icon.classList.add('fa-spin');
     if (dot)  dot.style.background = '#f59e0b';
 
-    fetch('/api/workspace/worklist', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    fetch('/api/pacs/worklist', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
     .then(r => r.json())
     .then(data => {
         if (data.ok) {
             const countEl = document.getElementById('pacs-count');
             if (countEl) countEl.textContent = data.total;
 
-            // Atualiza o corpo da tabela
+            // Re-renderiza a tabela com os dados recebidos
             const body = document.getElementById('pacs-worklist-body');
-            if (body && data.html) {
-                body.innerHTML = data.html;
-            } else if (body && data.itens !== undefined) {
-                if (data.itens.length === 0) {
+            if (body) {
+                if (!data.itens || data.itens.length === 0) {
                     body.innerHTML = '<div style="padding:28px;text-align:center;color:var(--muted);">' +
                         '<i class="fa-solid fa-inbox" style="font-size:2rem;margin-bottom:8px;display:block;opacity:.4;"></i>' +
-                        '<div style="font-size:.85rem;">Nenhum exame assumido no VoxelPACS no momento.</div></div>';
+                        '<div style="font-size:.85rem;">Nenhum exame assumido no VoxelPACS no momento.</div>' +
+                        '<div style="font-size:.75rem;margin-top:4px;">Quando você assumir um exame no PACS, ele aparecerá aqui automaticamente.</div></div>';
+                } else {
+                    const statusMap = {
+                        'aguardando': ['#f59e0b','Aguardando'],
+                        'em_laudo':   ['#0ea5e9','Em Laudo'],
+                        'rascunho':   ['#8b5cf6','Rascunho'],
+                        'assinado':   ['#22c55e','Assinado'],
+                        'enviado':    ['#10b981','Enviado'],
+                        'erro':       ['#ef4444','Erro'],
+                    };
+                    let rows = data.itens.map(pw => {
+                        const st = pw.status || 'aguardando';
+                        const [stColor, stLabel] = statusMap[st] || ['#6b7280','Desconhecido'];
+                        const pName = pw.patient_nome || pw.patient_name || 'Não identificado';
+                        const pMods = (pw.modalidade || pw.modalities || '').split('\\').filter(m=>m.trim());
+                        const pInst = pw.institution_name || '';
+                        const pDate = pw.study_date ? new Date(pw.study_date).toLocaleDateString('pt-BR') : '—';
+                        const pUid  = pw.study_instance_uid || '';
+                        const pLaudo= pw.laudo_id || null;
+                        const pwId  = pw.id || 0;
+                        const modsHtml = pMods.length
+                            ? pMods.map(m => `<span style="background:rgba(14,165,233,.1);border:1px solid rgba(14,165,233,.2);color:#38bdf8;padding:2px 8px;border-radius:100px;font-size:.68rem;font-weight:700;margin-right:2px;">${m.trim()}</span>`).join('')
+                            : '—';
+                        const acaoHtml = pLaudo
+                            ? `<a href="/workspace/${pLaudo}" class="btn btn-ghost btn-xs" style="margin-right:4px;"><i class="fa-solid fa-pen"></i> Laudar</a>`
+                            : `<button onclick="pacsAbrirViewer('${pUid.replace(/'/g,"\\'")}',${ pwId })" class="btn btn-ghost btn-xs" style="margin-right:4px;"><i class="fa-solid fa-eye"></i> Abrir</button>`;
+                        return `<tr>
+                            <td>
+                                <div style="font-weight:600;font-size:.82rem;color:#e2e8f0;">${pName}</div>
+                                <div style="font-size:.68rem;color:var(--muted);font-family:monospace;">${pUid.substring(0,24)}...</div>
+                            </td>
+                            <td>${modsHtml}</td>
+                            <td style="font-size:.75rem;color:var(--muted);">${pInst}</td>
+                            <td style="font-size:.75rem;color:var(--muted);">${pDate}</td>
+                            <td><span style="background:${stColor}22;border:1px solid ${stColor}44;color:${stColor};padding:2px 10px;border-radius:100px;font-size:.7rem;font-weight:700;">${stLabel}</span></td>
+                            <td>${acaoHtml}</td>
+                        </tr>`;
+                    }).join('');
+                    body.innerHTML = '<div style="overflow-x:auto;"><table class="table" style="margin:0;"><thead><tr>' +
+                        '<th style="font-size:.72rem;">Paciente</th><th style="font-size:.72rem;">Modalidade</th>' +
+                        '<th style="font-size:.72rem;">Unidade</th><th style="font-size:.72rem;">Data Estudo</th>' +
+                        '<th style="font-size:.72rem;">Status</th><th style="font-size:.72rem;">Ações</th>' +
+                        '</tr></thead><tbody>' + rows + '</tbody></table></div>';
                 }
             }
 
@@ -182,7 +223,7 @@ function pacsSync() {
 }
 
 function pacsAbrirViewer(studyUid, worklistId) {
-    fetch('/api/workspace/viewer-url?study_uid=' + encodeURIComponent(studyUid), {
+    fetch('/api/pacs/viewer-url?study_uid=' + encodeURIComponent(studyUid), {
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
     })
     .then(r => r.json())

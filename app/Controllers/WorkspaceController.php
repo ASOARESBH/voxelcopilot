@@ -82,14 +82,23 @@ class WorkspaceController extends Controller {
             if ($pacsAuth) {
                 $pacsUnitName = $pacsAuth->nome_instituicao ?? $pacsAuth->codigo_unidade;
                 $wStmt = $pdo->prepare("
-                    SELECT w.id, w.study_instance_uid, w.patient_name, w.patient_id,
-                           w.modalities, w.study_date, w.study_description,
-                           w.institution_name, w.status_copilot, w.laudo_id,
+                    SELECT w.id, w.study_instance_uid, w.accession_number,
+                           w.patient_nome AS patient_name,
+                           w.patient_id, w.patient_birth_date, w.patient_sex,
+                           w.modalidade AS modalities,
+                           w.study_date, w.study_description,
+                           w.institution_name,
+                           w.status AS status_copilot,
+                           w.laudo_id, w.workspace_id,
+                           w.num_series, w.num_instances, w.prioridade,
+                           w.medico_nome, w.medico_crm,
                            w.assumido_em, w.created_at
                     FROM cop_pacs_worklist w
-                    WHERE w.medico_user_id = :uid
-                      AND w.status_copilot NOT IN ('assinado','cancelado')
-                    ORDER BY w.assumido_em DESC
+                    WHERE w.user_id = :uid
+                      AND w.status NOT IN ('assinado','cancelado')
+                    ORDER BY
+                        CASE w.prioridade WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1 ELSE 2 END,
+                        w.assumido_em DESC
                     LIMIT 50
                 ");
                 $wStmt->execute(['uid' => $medicoId]);
@@ -716,9 +725,9 @@ class WorkspaceController extends Controller {
                 FROM cop_pacs_worklist w
                 JOIN cop_pacs_autorizacoes a ON a.id = w.autorizacao_id
                 JOIN cop_pacs_unidades u ON u.id = a.unidade_id
-                WHERE w.user_id = :uid AND w.study_instance_uid = :uid2 LIMIT 1
+                WHERE w.user_id = :uid AND w.study_instance_uid = :study_uid LIMIT 1
             ");
-            $stmt->execute(['uid' => $medicoId, 'uid2' => $studyUid]);
+            $stmt->execute(['uid' => $medicoId, 'study_uid' => $studyUid]);
             $row = $stmt->fetch(\PDO::FETCH_OBJ);
 
             if ($row) {
