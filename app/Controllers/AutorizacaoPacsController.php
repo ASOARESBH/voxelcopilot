@@ -130,7 +130,7 @@ class AutorizacaoPacsController extends Controller {
             exit;
         }
 
-        // Verifica se já existe vínculo
+                // Verifica se já existe vínculo
         $stmt = $pdo->prepare("
             SELECT id, status FROM cop_pacs_autorizacoes
             WHERE unidade_id = :uid AND medico_user_id = :mid
@@ -138,9 +138,41 @@ class AutorizacaoPacsController extends Controller {
         ");
         $stmt->execute(['uid' => $unidade->id, 'mid' => $userId]);
         $existente = $stmt->fetch(\PDO::FETCH_OBJ);
-
         if ($existente) {
-            header('Location: /configuracoes?tab=autorizacao&erro=ja_vinculado');
+            // Permite re-vínculo se o status for revogado ou inativo
+            // (médico revogou e quer vincular novamente com novo token)
+            if ($existente->status === 'ativo' || $existente->status === 'pendente') {
+                Logger::pacs('WARNING', '[AutorizacaoPacsController::cadastrar] Vínculo já ativo', [
+                    'user_id'        => $userId,
+                    'unidade_id'     => $unidade->id,
+                    'autorizacao_id' => $existente->id,
+                    'status'         => $existente->status,
+                ]);
+                header('Location: /configuracoes?tab=autorizacao&erro=ja_vinculado');
+                exit;
+            }
+            // Status revogado ou inativo: reativa o vínculo com o novo token
+            Logger::pacs('INFO', '[AutorizacaoPacsController::cadastrar] Reativando vínculo revogado/inativo', [
+                'user_id'        => $userId,
+                'unidade_id'     => $unidade->id,
+                'autorizacao_id' => $existente->id,
+                'status_anterior'=> $existente->status,
+            ]);
+            $pdo->prepare("
+                UPDATE cop_pacs_autorizacoes SET
+                    token_integracao   = :token,
+                    status             = 'ativo',
+                    motivo_revogacao   = NULL,
+                    data_ativacao      = NOW(),
+                    updated_at         = NOW()
+                WHERE id = :id
+            ")->execute(['token' => $token, 'id' => $existente->id]);
+            Logger::pacs('INFO', '[AutorizacaoPacsController::cadastrar] Vínculo reativado com sucesso', [
+                'user_id'        => $userId,
+                'unidade_id'     => $unidade->id,
+                'autorizacao_id' => $existente->id,
+            ]);
+            header('Location: /configuracoes?tab=autorizacao&sucesso=vinculado');
             exit;
         }
 

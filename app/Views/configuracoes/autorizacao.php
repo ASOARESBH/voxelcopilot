@@ -39,6 +39,7 @@
     <?php $msgs = [
       'vinculo_criado'   => 'Autorização cadastrada com sucesso! Você já pode laudar exames desta unidade.',
       'vinculo_revogado' => 'Autorização revogada. O vínculo com a unidade foi encerrado.',
+      'vinculado'        => 'Vínculo reativado com sucesso! Você já pode laudar exames desta unidade.',
     ]; ?>
     <div class="alert alert-success" style="margin-bottom:16px;">
       <i class="fa-solid fa-circle-check"></i>
@@ -50,7 +51,7 @@
       'campos_obrigatorios'   => 'Preencha o código e o token da unidade.',
       'unidade_nao_encontrada'=> 'Código de unidade não encontrado. Verifique com a clínica.',
       'unidade_suspensa'      => 'Esta unidade está suspensa e não aceita novos vínculos.',
-      'ja_vinculado'          => 'Você já possui um vínculo com esta unidade.',
+      'ja_vinculado'          => 'Você já possui um vínculo ativo com esta unidade. Para vincular novamente, clique em <strong>Revogar</strong> na tabela abaixo e depois cadastre novamente.',
       'id_invalido'           => 'Identificador inválido.',
       'nao_autorizado'        => 'Operação não permitida.',
     ]; ?>
