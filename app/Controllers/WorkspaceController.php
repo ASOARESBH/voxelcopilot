@@ -70,41 +70,44 @@ class WorkspaceController extends Controller {
         $pacsTotal     = 0;
         $pacsUnitName  = null;
         try {
+            // Nome da unidade principal (para exibir no cabeçalho) — opcional
             $authStmt = $pdo->prepare("
-                SELECT a.id, u.codigo_unidade, u.nome_instituicao, u.pacs_tipo
+                SELECT u.nome_instituicao, u.codigo_unidade
                 FROM cop_pacs_autorizacoes a
                 JOIN cop_pacs_unidades u ON u.id = a.unidade_id
                 WHERE a.medico_user_id = :uid AND a.status = 'ativo'
-                LIMIT 1
+                ORDER BY a.id ASC LIMIT 1
             ");
             $authStmt->execute(['uid' => $medicoId]);
             $pacsAuth = $authStmt->fetch();
             if ($pacsAuth) {
                 $pacsUnitName = $pacsAuth->nome_instituicao ?? $pacsAuth->codigo_unidade;
-                $wStmt = $pdo->prepare("
-                    SELECT w.id, w.study_instance_uid, w.accession_number,
-                           w.patient_nome AS patient_name,
-                           w.patient_id, w.patient_birth_date, w.patient_sex,
-                           w.modalidade AS modalities,
-                           w.study_date, w.study_description,
-                           w.institution_name,
-                           w.status AS status_copilot,
-                           w.laudo_id, w.workspace_id,
-                           w.num_series, w.num_instances, w.prioridade,
-                           w.medico_nome, w.medico_crm,
-                           w.assumido_em, w.created_at
-                    FROM cop_pacs_worklist w
-                    WHERE w.user_id = :uid
-                      AND w.status NOT IN ('assinado','cancelado')
-                    ORDER BY
-                        CASE w.prioridade WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1 ELSE 2 END,
-                        w.assumido_em DESC
-                    LIMIT 50
-                ");
-                $wStmt->execute(['uid' => $medicoId]);
-                $pacsWorklist = $wStmt->fetchAll();
-                $pacsTotal    = count($pacsWorklist);
             }
+
+            // Busca worklist diretamente por user_id — independe de ter autorização ativa
+            $wStmt = $pdo->prepare("
+                SELECT w.id, w.study_instance_uid, w.accession_number,
+                       w.patient_nome AS patient_name,
+                       w.patient_id, w.patient_birth_date, w.patient_sex,
+                       w.modalidade AS modalities,
+                       w.study_date, w.study_description,
+                       w.institution_name,
+                       w.status AS status_copilot,
+                       w.laudo_id, w.workspace_id,
+                       w.num_series, w.num_instances, w.prioridade,
+                       w.medico_nome, w.medico_crm,
+                       w.assumido_em, w.created_at
+                FROM cop_pacs_worklist w
+                WHERE w.user_id = :uid
+                  AND w.status NOT IN ('assinado','cancelado')
+                ORDER BY
+                    CASE w.prioridade WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1 ELSE 2 END,
+                    w.assumido_em DESC
+                LIMIT 50
+            ");
+            $wStmt->execute(['uid' => $medicoId]);
+            $pacsWorklist = $wStmt->fetchAll();
+            $pacsTotal    = count($pacsWorklist);
         } catch (\Throwable $e) {
             // Tabela pode não existir ainda — silencia
         }

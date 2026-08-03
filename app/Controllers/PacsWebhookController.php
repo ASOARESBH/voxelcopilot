@@ -100,7 +100,8 @@ class PacsWebhookController extends Controller
         }
 
         // Resolve o user_id do médico via token de integração
-        $userId = $auth->medico_user_id;
+        // Prioridade: _meta.medico_token (token individual) > auth->medico_user_id (token de unidade)
+        $userId = $auth->medico_user_id ?? null;
         if ($medicoToken) {
             $stmtMed = $pdo->prepare("
                 SELECT medico_user_id FROM cop_pacs_autorizacoes
@@ -109,6 +110,16 @@ class PacsWebhookController extends Controller
             $stmtMed->execute(['tok' => $medicoToken, 'uid' => $auth->unidade_id]);
             $row = $stmtMed->fetch(\PDO::FETCH_OBJ);
             if ($row) $userId = $row->medico_user_id;
+        }
+        if (!$userId) {
+            // Não foi possível identificar o médico: token individual ausente ou inválido.
+            // O médico precisa vincular a unidade no Copilot (Configurações > Autorização).
+            Logger::error('[PacsWebhookController::handleEstudoAssumido] medico_user_id não resolvido', [
+                'study_uid'    => $studyUid,
+                'medico_token' => $medicoToken ? substr($medicoToken, 0, 12) . '...' : '(vazio)',
+                'unidade_id'   => $auth->unidade_id,
+            ]);
+            return ['ok' => false, 'erro' => 'medico_nao_vinculado', 'msg' => 'Médico não encontrado no Copilot. Verifique o vínculo em Configurações > Autorização.'];
         }
 
         try {
@@ -330,28 +341,32 @@ class PacsWebhookController extends Controller
             }
             // Fallback: token da unidade (copilot_api_token em cop_pacs_unidades)
             // Gerado pelo Copilot e retornado ao PACS no registro da unidade.
-            // Neste caso, o medico_user_id é o primeiro médico ativo da unidade
+            // Neste caso, medico_user_id fica NULL — será resolvido via _meta.medico_token
+            // no handleEstudoAssumido (token individual do médico em cop_pacs_autorizacoes).
             $stmtU = $pdo->prepare("
                 SELECT
-                    a.id, a.unidade_id, a.medico_user_id, a.status,
-                    a.token_expira_em, a.modalidades_permitidas,
-                    a.medico_nome, a.medico_crm, a.medico_crm_uf,
-                    u.codigo_unidade, u.chave_secreta,
-                    COALESCE(a.tenant_id, u.tenant_id) AS tenant_id
+                    u.id        AS id,
+                    u.id        AS unidade_id,
+                    NULL        AS medico_user_id,
+                    'ativo'     AS status,
+                    NULL        AS token_expira_em,
+                    NULL        AS modalidades_permitidas,
+                    NULL        AS medico_nome,
+                    NULL        AS medico_crm,
+                    NULL        AS medico_crm_uf,
+                    u.codigo_unidade,
+                    u.chave_secreta,
+                    u.tenant_id AS tenant_id
                 FROM cop_pacs_unidades u
-                JOIN cop_pacs_autorizacoes a ON a.unidade_id = u.id AND a.status = 'ativo'
-                WHERE u.copilot_api_token = :tok
-                ORDER BY a.id ASC
+                WHERE u.copilot_api_token = :tok AND u.status = 'ativo'
                 LIMIT 1
             ");
             $stmtU->execute(['tok' => $token]);
             $authU = $stmtU->fetch(\PDO::FETCH_OBJ);
             if ($authU) {
-                if ($authU->token_expira_em && strtotime($authU->token_expira_em) < time()) return null;
                 Logger::info('[PacsWebhookController::validarToken] Autenticado via copilot_api_token da unidade', [
                     'unidade_id'     => $authU->unidade_id,
                     'codigo_unidade' => $authU->codigo_unidade,
-                    'medico_user_id' => $authU->medico_user_id,
                 ]);
                 return $authU;
             }
