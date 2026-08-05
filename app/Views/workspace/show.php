@@ -1,5 +1,6 @@
 <?php
-$extraCss = ['/assets/css/workspace.css?v=3.1.0'];
+$extraCss  = ['/assets/css/workspace.css?v=3.2.0'];
+$mainClass = 'main-content--workspace'; /* remove padding e overflow do main para o editor de laudo ocupar 100% */
 $isRadiologista = !empty($layoutRadiologista);
 
 // Cabeçalho e assinatura via ReportEngineService

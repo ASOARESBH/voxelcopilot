@@ -253,4 +253,4 @@ if ($user) {
 <!-- ══════════════════════════════════════════════════════════
      CONTEÚDO PRINCIPAL
 ═══════════════════════════════════════════════════════════ -->
-<main class="main-content" id="main-content">
+<main class="main-content<?= isset($mainClass) ? ' ' . htmlspecialchars($mainClass) : '' ?>" id="main-content">
